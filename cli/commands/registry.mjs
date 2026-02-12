@@ -23,7 +23,12 @@ const REPUTATION_ABI = JSON.parse(
   fs.readFileSync(path.join(__dirname, '../../contracts/ReputationRegistry.json'), 'utf8')
 )
 
-// Helper: Run transaction via DappClient
+// Default nodes URL — matches seq-eco.mjs exactly
+function defaultNodesUrl(_projectAccessKey) {
+  return 'https://nodes.sequence.app/{network}'
+}
+
+// Helper: Run transaction via DappClient (mirrors seq-eco.mjs runDappClientTx)
 async function runRegistryTx({ walletName, contractAddress, data, broadcast = true }) {
   const { DappClient, TransportMode, jsonRevivers } = await import('@0xsequence/dapp-client')
 
@@ -31,6 +36,9 @@ async function runRegistryTx({ walletName, contractAddress, data, broadcast = tr
   if (!session) {
     throw new Error(`Wallet not found: ${walletName}`)
   }
+
+  const walletAddress = session.walletAddress
+  const chainId = 137 // Registry is on Polygon
 
   const projectAccessKey = process.env.SEQUENCE_PROJECT_ACCESS_KEY
   if (!projectAccessKey) {
@@ -43,53 +51,54 @@ async function runRegistryTx({ walletName, contractAddress, data, broadcast = tr
     throw new Error('Missing SEQUENCE_DAPP_ORIGIN environment variable')
   }
 
-  // Parse session data
-  const explicitSession = session.session ? JSON.parse(JSON.stringify(session.session), jsonRevivers) : null
+  // Parse explicit session from stored JSON string
+  const explicitRaw = session.explicitSession
+  if (!explicitRaw) {
+    throw new Error('Missing explicit session. Re-run wallet start-session.')
+  }
+
+  const explicitSession = JSON.parse(explicitRaw, jsonRevivers)
   if (!explicitSession?.pk) {
-    throw new Error('Invalid session: missing pk. Re-run wallet start-session.')
+    throw new Error('Stored explicit session is missing pk; re-link wallet')
   }
 
-  // Check session deadline
-  const deadline = explicitSession?.config?.deadline
-  if (deadline) {
-    const deadlineSec = typeof deadline === 'bigint' ? Number(deadline) : Number(deadline)
-    const nowSec = Math.floor(Date.now() / 1000)
-    if (Number.isFinite(deadlineSec) && deadlineSec <= nowSec) {
-      throw new Error(`Session expired (deadline ${deadlineSec}). Re-run wallet start-session.`)
-    }
-  }
-
-  // Create in-memory storage
-  class MemorySequenceStorage {
+  // Keychain-backed storage modeled after seq-eco.mjs KeychainSequenceStorage
+  class KeychainSequenceStorage {
     constructor() {
+      this.pendingRedirect = false
+      this.tempSessionPk = null
+      this.pendingRequest = null
       this.explicitSessions = [{
         pk: explicitSession.pk,
-        walletAddress: session.walletAddress,
-        chainId: 137, // Polygon
+        walletAddress: explicitSession.walletAddress || walletAddress,
+        chainId,
         loginMethod: explicitSession.loginMethod,
         userEmail: explicitSession.userEmail,
         guard: explicitSession.guard
       }]
+      this.implicitSession = null
     }
-    async setPendingRedirectRequest() {}
-    async isRedirectRequestPending() { return false }
-    async saveTempSessionPk() {}
-    async getAndClearTempSessionPk() { return null }
-    async savePendingRequest() {}
-    async getAndClearPendingRequest() { return null }
-    async peekPendingRequest() { return null }
-    async saveExplicitSession(s) { this.explicitSessions = [s] }
-    async getExplicitSessions() { return this.explicitSessions }
+    async setPendingRedirectRequest(isPending) { this.pendingRedirect = !!isPending }
+    async isRedirectRequestPending() { return !!this.pendingRedirect }
+    async saveTempSessionPk(pk) { this.tempSessionPk = pk }
+    async getAndClearTempSessionPk() { const v = this.tempSessionPk; this.tempSessionPk = null; return v }
+    async savePendingRequest(context) { this.pendingRequest = context }
+    async getAndClearPendingRequest() { const v = this.pendingRequest; this.pendingRequest = null; return v }
+    async peekPendingRequest() { return this.pendingRequest }
+    async saveExplicitSession(sessionData) {
+      this.explicitSessions = [...this.explicitSessions.filter(s => !(s.walletAddress === sessionData.walletAddress && s.pk === sessionData.pk && s.chainId === sessionData.chainId)), sessionData]
+    }
+    async getExplicitSessions() { return [...this.explicitSessions] }
     async clearExplicitSessions() { this.explicitSessions = [] }
-    async saveImplicitSession() {}
-    async getImplicitSession() { return null }
-    async clearImplicitSession() {}
-    async saveSessionlessConnection() {}
-    async getSessionlessConnection() { return null }
-    async clearSessionlessConnection() {}
-    async saveSessionlessConnectionSnapshot() {}
-    async getSessionlessConnectionSnapshot() { return null }
-    async clearSessionlessConnectionSnapshot() {}
+    async saveImplicitSession(sessionData) { this.implicitSession = sessionData }
+    async getImplicitSession() { return this.implicitSession }
+    async clearImplicitSession() { this.implicitSession = null }
+    async saveSessionlessConnection(sessionData) { this.sessionlessConnection = sessionData }
+    async getSessionlessConnection() { return this.sessionlessConnection ?? null }
+    async clearSessionlessConnection() { this.sessionlessConnection = null }
+    async saveSessionlessConnectionSnapshot(sessionData) { this.sessionlessConnectionSnapshot = sessionData }
+    async getSessionlessConnectionSnapshot() { return this.sessionlessConnectionSnapshot ?? null }
+    async clearSessionlessConnectionSnapshot() { this.sessionlessConnectionSnapshot = null }
     async clearAllData() {}
   }
 
@@ -98,23 +107,49 @@ async function runRegistryTx({ walletName, contractAddress, data, broadcast = tr
     async getItem(k) { return this.kv.has(k) ? this.kv.get(k) : null }
     async setItem(k, v) { this.kv.set(k, v) }
     async removeItem(k) { this.kv.delete(k) }
-    async clear() { this.kv.clear() }
   }
 
-  const sequenceStorage = new MemorySequenceStorage()
-  const sessionStorage = new MapSessionStorage()
+  const sequenceStorage = new KeychainSequenceStorage()
+  const sequenceSessionStorage = new MapSessionStorage()
 
-  const client = new DappClient({
-    storage: {
-      sequenceStorage,
-      sessionStorage
-    },
-    walletUrl,
-    projectAccessKey,
-    dappOrigin,
-    transportMode: TransportMode.IFrame,
-    onConnect: () => {}
+  // Load implicit session if available
+  if (session.implicitPk && session.implicitAttestation && session.implicitIdentitySig) {
+    const implicitAttestation = JSON.parse(session.implicitAttestation, jsonRevivers)
+    const implicitIdentitySignature = JSON.parse(session.implicitIdentitySig, jsonRevivers)
+    const meta = session.implicitMeta ? JSON.parse(session.implicitMeta, jsonRevivers) : {}
+    await sequenceStorage.saveImplicitSession({
+      pk: session.implicitPk,
+      walletAddress: explicitSession.walletAddress || walletAddress,
+      attestation: implicitAttestation,
+      identitySignature: implicitIdentitySignature,
+      chainId,
+      loginMethod: meta.loginMethod,
+      userEmail: meta.userEmail,
+      guard: meta.guard
+    })
+  }
+
+  // Node.js polyfill
+  if (!globalThis.window) globalThis.window = { fetch: globalThis.fetch }
+  else if (!globalThis.window.fetch) globalThis.window.fetch = globalThis.fetch
+
+  const keymachineUrl = process.env.SEQUENCE_KEYMACHINE_URL || 'https://keymachine.sequence.app'
+  const nodesUrl = process.env.SEQUENCE_NODES_URL || defaultNodesUrl(projectAccessKey)
+  const relayerUrl = process.env.SEQUENCE_RELAYER_URL || 'https://{network}-relayer.sequence.app'
+
+  // Create DappClient — matches seq-eco.mjs constructor signature exactly
+  const client = new DappClient(walletUrl, dappOrigin, projectAccessKey, {
+    transportMode: TransportMode.REDIRECT,
+    keymachineUrl,
+    nodesUrl,
+    relayerUrl,
+    sequenceStorage,
+    sequenceSessionStorage,
+    canUseIndexedDb: false
   })
+
+  await client.initialize()
+  if (!client.isInitialized) throw new Error('Client not initialized')
 
   const transactions = [{
     to: contractAddress,
@@ -123,22 +158,58 @@ async function runRegistryTx({ walletName, contractAddress, data, broadcast = tr
   }]
 
   if (!broadcast) {
-    console.log(JSON.stringify({ ok: true, dryRun: true, message: 'Dry run complete (use --broadcast to execute)' }, null, 2))
-    return { walletAddress: session.walletAddress, dryRun: true }
+    const bigintReplacer = (_k, v) => (typeof v === 'bigint' ? v.toString() : v)
+    console.log(JSON.stringify({ ok: true, dryRun: true, walletName, walletAddress, transactions }, bigintReplacer, 2))
+    return { walletAddress, dryRun: true }
   }
 
-  const result = await client.sendTransaction({
-    chainId: 137, // Polygon
-    transactions,
-    broadcast: true
-  })
+  // Fee options handling (matches seq-eco.mjs)
+  let feeOpt
+  try {
+    const feeOptions = await client.getFeeOptions(chainId, transactions)
+    feeOpt = feeOptions?.[0]
+  } catch (e) {
+    const enabled = !['0', 'false', 'no'].includes(String(process.env.SEQ_ECO_FEEOPTIONS_WORKAROUND || 'true').toLowerCase())
+    if (!enabled) throw e
 
-  const txHash = result?.txHash || result?.hash
-  if (!txHash) {
-    throw new Error('Transaction sent but no txHash returned')
+    try {
+      const mgr = client.getChainSessionManager ? client.getChainSessionManager(chainId) : null
+      const direct = await mgr?.relayer?.feeOptions?.(walletAddress, chainId, transactions)
+      const opts = direct?.options
+      if (Array.isArray(opts) && opts.length) {
+        feeOpt = opts[0]
+      }
+    } catch {
+      // ignore, fall back
+    }
+
+    if (!feeOpt) {
+      let feeTokens
+      try {
+        feeTokens = await client.getFeeTokens(chainId)
+      } catch {
+        throw e
+      }
+
+      const paymentAddress = feeTokens?.paymentAddress
+      const tokens = Array.isArray(feeTokens?.tokens) ? feeTokens.tokens : []
+      const token = tokens.find((t) => t?.contractAddress) || null
+      if (!paymentAddress || !token) throw e
+
+      const decimals = typeof token.decimals === 'number' ? token.decimals : 6
+      const feeValue = decimals >= 3 ? 10 ** (decimals - 3) : 1
+
+      feeOpt = {
+        token,
+        to: paymentAddress,
+        value: String(feeValue),
+        gasLimit: 0
+      }
+    }
   }
 
-  return { walletAddress: session.walletAddress, txHash, dryRun: false }
+  const txHash = await client.sendTransaction(chainId, transactions, feeOpt)
+  return { walletAddress, txHash, feeOptionUsed: feeOpt }
 }
 
 // Register agent on IdentityRegistry
