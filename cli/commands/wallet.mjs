@@ -8,21 +8,25 @@ import sealedbox from 'tweetnacl-sealedbox-js'
 import { saveWalletSession, loadWalletSession, saveWalletRequest, loadWalletRequest, listWallets } from '../../lib/storage.mjs'
 import { getArg, hasFlag, normalizeChain, resolveNetwork } from '../../lib/utils.mjs'
 
-// Base64 URL encode
+// Base64 URL encode — matches seq-eco.mjs exactly
 function b64urlEncode(buf) {
-  return Buffer.from(buf).toString('base64url')
+  return Buffer.from(buf)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '')
 }
 
-// Base64 URL decode
+// Base64 URL decode — matches seq-eco.mjs exactly
 function b64urlDecode(str) {
-  return Buffer.from(str, 'base64url')
+  const norm = str.replace(/-/g, '+').replace(/_/g, '/')
+  const pad = norm.length % 4 === 0 ? '' : '='.repeat(4 - (norm.length % 4))
+  return Buffer.from(norm + pad, 'base64')
 }
 
-// Generate random ID
-function randomId(bytes) {
-  const arr = new Uint8Array(bytes)
-  crypto.getRandomValues(arr)
-  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('')
+// Generate random ID — matches seq-eco.mjs exactly (base64url, NOT hex)
+function randomId(bytes = 16) {
+  return b64urlEncode(nacl.randomBytes(bytes))
 }
 
 // Wallet create command (formerly create-request)
@@ -77,12 +81,6 @@ export async function walletCreate() {
     const projectAccessKey = getArg(args, '--access-key') || process.env.SEQUENCE_PROJECT_ACCESS_KEY
     if (projectAccessKey) {
       url.searchParams.set('accessKey', projectAccessKey)
-    }
-
-    // Add DAPP origin
-    const dappOrigin = process.env.SEQUENCE_DAPP_ORIGIN
-    if (dappOrigin) {
-      url.searchParams.set('origin', dappOrigin)
     }
 
     console.log(JSON.stringify({
