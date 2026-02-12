@@ -1,0 +1,29 @@
+{
+  "name": "polygon-agent-kit",
+  "version": "0.1.0",
+  "description": "Complete Polygon agent development toolkit - builder, wallet, operations, 8004 registry",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "polygon-agent": "./cli/polygon-agent.mjs"
+  },
+  "dependencies": {
+    "@0xsequence/abi": "3.0.0-beta.15",
+    "@0xsequence/api": "3.0.0-beta.15",
+    "@0xsequence/builder": "3.0.0-beta.15",
+    "@0xsequence/dapp-client": "3.0.0-beta.15",
+    "@0xsequence/indexer": "^2.3.40",
+    "@0xsequence/network": "^2.3.40",
+    "@0xsequence/relayer": "3.0.0-beta.15",
+    "@0xsequence/wallet-core": "3.0.0-beta.15",
+    "@0xsequence/wallet-primitives": "3.0.0-beta.15",
+    "@0xsequence/wallet-wdk": "3.0.0-beta.15",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.0",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-sealedbox-js": "^1.2.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
