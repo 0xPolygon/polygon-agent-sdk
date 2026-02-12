@@ -368,10 +368,17 @@ export async function sendNative() {
     const decimals = network.nativeCurrency?.decimals ?? 18
     const value = parseUnits(amount, decimals)
 
+    // Route through ValueForwarder (session permissions are scoped to this contract)
+    // forwardValue(address,uint256) selector = 0x98f850f1
+    const VALUE_FORWARDER = '0xABAAd93EeE2a569cF0632f39B10A9f5D734777ca'
+    const selector = '0x98f850f1'
+    const pad = (hex, n = 64) => String(hex).replace(/^0x/, '').padStart(n, '0')
+    const data = selector + pad(to) + pad('0x' + value.toString(16))
+
     const transactions = [{
-      to,
+      to: VALUE_FORWARDER,
       value,
-      data: '0x'
+      data
     }]
 
     const result = await runDappClientTx({
