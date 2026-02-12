@@ -18,10 +18,12 @@
     "@0xsequence/wallet-core": "3.0.0-beta.15",
     "@0xsequence/wallet-primitives": "3.0.0-beta.15",
     "@0xsequence/wallet-wdk": "3.0.0-beta.15",
+    "@0xtrails/api": "^0.10.4",
     "dotenv": "^16.4.5",
     "ethers": "^6.13.0",
     "tweetnacl": "^1.0.3",
-    "tweetnacl-sealedbox-js": "^1.2.0"
+    "tweetnacl-sealedbox-js": "^1.2.0",
+    "viem": "^2.45.3"
   },
   "engines": {
     "node": ">=20.0.0"

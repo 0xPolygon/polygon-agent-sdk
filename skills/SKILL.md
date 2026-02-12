@@ -1,6 +1,6 @@
 ---
 name: polygon-agent-kit
-description: Complete Polygon agent development toolkit with full ERC-8004 integration. Builder setup (1 command), ecosystem wallet (session-based), token operations (send POL/ERC20), agent registry (identity + reputation), feedback system. Chain-specific indexer with RPC fallback, encrypted storage at ~/.polygon-agent/
+description: Complete Polygon agent development toolkit with full ERC-8004 integration. Builder setup (1 command), ecosystem wallet (session-based), token operations (send POL/ERC20, DEX swaps via Trails), agent registry (identity + reputation), feedback system. Chain-specific indexer with RPC fallback, encrypted storage at ~/.polygon-agent/
 ---
 
 # Polygon Agent Kit
@@ -104,9 +104,13 @@ node cli/polygon-agent.mjs send-native --wallet main --to 0x... --amount 1.5 --b
 node cli/polygon-agent.mjs send-token --wallet main --symbol USDC --to 0x... --amount 10 --broadcast
 ```
 
-**Swap** (coming soon):
+**Swap tokens**:
 ```bash
-node cli/polygon-agent.mjs swap --wallet main --from USDC --to USDT --amount 5 --broadcast
+# Execute DEX swap via Trails API
+node cli/polygon-agent.mjs swap --wallet main --from USDC --to USDT --amount 5 --slippage 0.005 --broadcast
+
+# Dry run (preview without broadcasting)
+node cli/polygon-agent.mjs swap --wallet main --from USDC --to USDT --amount 5
 ```
 
 ### Phase 4: ERC-8004 Agent Registry
@@ -359,10 +363,18 @@ The polygon-agent-kit includes full **ERC-8004 Trustless Agents** integration fo
 - ✅ Feedback submission and queries
 - ✅ Tag-based filtering
 
+**Token Operations** (Full Implementation):
+- ✅ Balance queries (IndexerGateway + RPC fallback)
+- ✅ Send native tokens (POL/MATIC)
+- ✅ Send ERC20 by symbol (token-directory resolution)
+- ✅ DEX swaps via Trails API (USDC/USDT/WETH/etc.)
+- ✅ Slippage control for swaps
+- ✅ Dry-run mode for all operations
+
 ### 🚧 Coming Soon
-- Swap functionality (requires @0xtrails/api package)
 - ValidationRegistry integration (ERC-8004 validation layer)
 - Multi-chain support (Base, Arbitrum, Optimism)
+- Batch operations (multiple sends in one tx)
 
 ## Example: Full Agent Flow
 

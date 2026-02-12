@@ -438,12 +438,208 @@ export async function sendToken() {
 
 // Swap command (Trails API)
 export async function swap() {
-  console.error(JSON.stringify({
-    ok: false,
-    error: 'Swap command implementation in progress',
-    message: 'Trails API integration requires @0xtrails/api package - coming in next update'
-  }, null, 2))
-  process.exit(1)
+  const args = process.argv.slice(2)
+  const walletName = getArg(args, '--wallet')
+  const fromSymbol = getArg(args, '--from')
+  const toSymbol = getArg(args, '--to')
+  const amount = getArg(args, '--amount')
+  const slippageArg = getArg(args, '--slippage')
+  const broadcast = hasFlag(args, '--broadcast')
+
+  if (!walletName || !fromSymbol || !toSymbol || !amount) {
+    console.error(JSON.stringify({
+      ok: false,
+      error: 'Missing required parameters: --wallet, --from, --to, --amount'
+    }, null, 2))
+    process.exit(1)
+  }
+
+  if (fromSymbol.toUpperCase() === toSymbol.toUpperCase()) {
+    console.error(JSON.stringify({
+      ok: false,
+      error: 'from and to token must be different'
+    }, null, 2))
+    process.exit(1)
+  }
+
+  try {
+    const session = await loadWalletSession(walletName)
+    if (!session) {
+      throw new Error(`Wallet not found: ${walletName}`)
+    }
+
+    const projectAccessKey = process.env.SEQUENCE_PROJECT_ACCESS_KEY
+    if (!projectAccessKey) {
+      throw new Error('Missing SEQUENCE_PROJECT_ACCESS_KEY environment variable')
+    }
+
+    const walletUrl = process.env.SEQUENCE_ECOSYSTEM_WALLET_URL || DEFAULT_WALLET_URL
+    const dappOrigin = process.env.SEQUENCE_DAPP_ORIGIN
+    if (!dappOrigin) {
+      throw new Error('Missing SEQUENCE_DAPP_ORIGIN environment variable')
+    }
+
+    const chainArg = getArg(args, '--chain')
+    const network = resolveNetwork(chainArg || session.chain || 'polygon')
+    const chainId = network.chainId
+    const nativeSymbol = network.nativeCurrency?.symbol || 'NATIVE'
+
+    const slippage = slippageArg ? Number(slippageArg) : 0.005
+    if (!Number.isFinite(slippage) || slippage <= 0 || slippage >= 0.5) {
+      throw new Error('Invalid --slippage (must be between 0 and 0.5)')
+    }
+
+    // Resolve tokens
+    const fromToken = await getTokenConfig({ chainId, symbol: fromSymbol, nativeSymbol })
+    const toToken = await getTokenConfig({ chainId, symbol: toSymbol, nativeSymbol })
+
+    if (fromToken.address.toLowerCase() === toToken.address.toLowerCase()) {
+      throw new Error('from and to token must be different')
+    }
+
+    // Initialize Trails API
+    const { TrailsApi, TradeType } = await import('@0xtrails/api')
+    const trailsApiKey = process.env.TRAILS_API_KEY || projectAccessKey
+    const trails = new TrailsApi(trailsApiKey, {
+      hostname: process.env.TRAILS_API_HOSTNAME
+    })
+
+    // Get wallet address
+    const walletAddress = session.walletAddress
+
+    // Parse amount
+    const { parseUnits } = await import('viem')
+    const originTokenAmount = parseUnits(amount, fromToken.decimals).toString()
+
+    // Get quote
+    const quoteReq = {
+      ownerAddress: walletAddress,
+      originChainId: chainId,
+      originTokenAddress: fromToken.address,
+      originTokenAmount,
+      destinationChainId: chainId,
+      destinationTokenAddress: toToken.address,
+      destinationTokenAmount: '0',
+      tradeType: TradeType.EXACT_INPUT,
+      options: {
+        slippageTolerance: slippage
+      }
+    }
+
+    const quoteRes = await trails.quoteIntent(quoteReq)
+    if (!quoteRes?.intent) {
+      throw new Error('No intent returned from quoteIntent')
+    }
+
+    const intent = quoteRes.intent
+
+    // Commit intent
+    const commitRes = await trails.commitIntent({ intent })
+    const intentId = commitRes?.intentId || intent.intentId
+    if (!intentId) {
+      throw new Error('No intentId from commitIntent')
+    }
+
+    const depositTx = intent.depositTransaction
+    if (!depositTx?.to) {
+      throw new Error('Intent missing depositTransaction')
+    }
+
+    const transactions = [{
+      to: depositTx.to,
+      data: depositTx.data || '0x',
+      value: depositTx.value ? BigInt(depositTx.value) : 0n
+    }]
+
+    const bigintReplacer = (_k, v) => (typeof v === 'bigint' ? v.toString() : v)
+
+    if (!broadcast) {
+      console.log(JSON.stringify({
+        ok: true,
+        dryRun: true,
+        walletName,
+        walletAddress,
+        intentId,
+        fromToken: fromToken.symbol,
+        toToken: toToken.symbol,
+        amount,
+        depositTransaction: depositTx,
+        note: 'Re-run with --broadcast to submit the deposit transaction and execute the intent.'
+      }, bigintReplacer, 2))
+      return
+    }
+
+    // Execute swap via DappClient
+    const { txHash } = await runDappClientTx({
+      walletName,
+      chainId,
+      walletUrl,
+      projectAccessKey,
+      dappOrigin,
+      transactions,
+      broadcast: true
+    })
+
+    // Execute intent
+    const execRes = await trails.executeIntent({
+      intentId,
+      depositTransactionHash: txHash
+    })
+
+    // Wait for receipt
+    const receipt = await trails.waitIntentReceipt({ intentId })
+
+    const explorerUrl = getExplorerUrl(network, txHash)
+    console.log(JSON.stringify({
+      ok: true,
+      walletName,
+      walletAddress,
+      chain: network.name,
+      chainId,
+      fromToken: fromToken.symbol,
+      toToken: toToken.symbol,
+      amount,
+      intentId,
+      depositTxHash: txHash,
+      depositExplorerUrl: explorerUrl,
+      executeStatus: execRes?.intentStatus,
+      receipt
+    }, bigintReplacer, 2))
+
+  } catch (error) {
+    console.error(JSON.stringify({
+      ok: false,
+      error: error.message,
+      stack: error.stack
+    }, null, 2))
+    process.exit(1)
+  }
+}
+
+// Helper: Get token configuration (native or ERC20)
+async function getTokenConfig({ chainId, symbol, nativeSymbol }) {
+  const sym = String(symbol || '').toUpperCase().trim()
+
+  if (sym === 'NATIVE' || sym === nativeSymbol.toUpperCase() || sym === 'POL' || sym === 'MATIC') {
+    return {
+      symbol: nativeSymbol.toUpperCase(),
+      address: '0x0000000000000000000000000000000000000000',
+      decimals: 18
+    }
+  }
+
+  // Token Directory lookup
+  const { resolveErc20BySymbol } = await import('../../lib/token-directory.mjs')
+  const token = await resolveErc20BySymbol({ chainId, symbol: sym })
+  if (!token?.address || token.decimals == null) {
+    throw new Error(`Unknown token ${sym} on chainId=${chainId}`)
+  }
+
+  return {
+    symbol: sym,
+    address: token.address,
+    decimals: Number(token.decimals)
+  }
 }
 
 // Legacy command aliases
