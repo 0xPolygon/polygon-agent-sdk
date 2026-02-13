@@ -1,0 +1,27 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "eb0ae5f29980",
+  "strategy": "manual-commit",
+  "branch": "feature/webhook-callback",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "connector-ui/index.html",
+    "connector-ui/src/App.tsx"
+  ],
+  "sessions": [
+    {
+      "metadata": "/eb/0ae5f29980/0/metadata.json",
+      "transcript": "/eb/0ae5f29980/0/full.jsonl",
+      "context": "/eb/0ae5f29980/0/context.md",
+      "content_hash": "/eb/0ae5f29980/0/content_hash.txt",
+      "prompt": "/eb/0ae5f29980/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 22,
+    "cache_creation_tokens": 55523,
+    "cache_read_tokens": 610638,
+    "output_tokens": 134,
+    "api_call_count": 12
+  }
+}
