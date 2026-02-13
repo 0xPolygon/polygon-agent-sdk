@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "411d50197102",
+  "session_id": "4c58b72c-8439-4694-9718-a00235b307e0",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-13T13:14:39.008133Z",
+  "branch": "feature/webhook-callback",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "connector-ui/index.html",
+    "connector-ui/src/App.css",
+    "connector-ui/src/App.tsx",
+    "connector-ui/src/index.css",
+    "connector-ui/vite.config.ts"
+  ],
+  "agent": "Claude Code",
+  "checkpoint_transcript_start": 3643,
+  "transcript_lines_at_start": 3643,
+  "token_usage": {
+    "input_tokens": 39,
+    "cache_creation_tokens": 62551,
+    "cache_read_tokens": 4032780,
+    "output_tokens": 334,
+    "api_call_count": 29
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-13T13:14:38.073868Z",
+    "agent_lines": 278,
+    "human_added": 285,
+    "human_modified": 62,
+    "human_removed": 0,
+    "total_committed": 625,
+    "agent_percentage": 44.48
+  }
+}

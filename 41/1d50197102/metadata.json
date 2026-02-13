@@ -1,0 +1,30 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "411d50197102",
+  "strategy": "manual-commit",
+  "branch": "feature/webhook-callback",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "connector-ui/index.html",
+    "connector-ui/src/App.css",
+    "connector-ui/src/App.tsx",
+    "connector-ui/src/index.css",
+    "connector-ui/vite.config.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/41/1d50197102/0/metadata.json",
+      "transcript": "/41/1d50197102/0/full.jsonl",
+      "context": "/41/1d50197102/0/context.md",
+      "content_hash": "/41/1d50197102/0/content_hash.txt",
+      "prompt": "/41/1d50197102/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 39,
+    "cache_creation_tokens": 62551,
+    "cache_read_tokens": 4032780,
+    "output_tokens": 334,
+    "api_call_count": 29
+  }
+}
