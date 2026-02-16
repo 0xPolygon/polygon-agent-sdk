@@ -32,10 +32,11 @@ function randomId(bytes = 16) {
 
 // Parse session permission args and append them to a URL
 function applySessionPermissionParams(url, args) {
-  // One-off ERC20 transfer (fixed recipient + amount)
+  // One-off ERC20 transfer (fixed recipient + amount) — must provide both or neither
   const usdcTo = getArg(args, '--usdc-to')
   const usdcAmount = getArg(args, '--usdc-amount')
-  if (usdcTo && usdcAmount) {
+  if (usdcTo || usdcAmount) {
+    if (!usdcTo || !usdcAmount) throw new Error('Must provide both --usdc-to and --usdc-amount')
     url.searchParams.set('erc20', 'usdc')
     url.searchParams.set('erc20To', usdcTo)
     url.searchParams.set('erc20Amount', usdcAmount)

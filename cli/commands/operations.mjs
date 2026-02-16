@@ -37,6 +37,7 @@ export async function balances() {
     const indexerUrl = getIndexerUrl(network.chainId)
 
     // Fetch using raw API (gateway returns chain-nested response)
+    // Match upstream seq-eco.mjs request format: filter.accountAddresses + contractStatus
     const response = await fetch(indexerUrl, {
       method: 'POST',
       headers: {
@@ -44,8 +45,8 @@ export async function balances() {
         'X-Access-Key': indexerKey
       },
       body: JSON.stringify({
-        accountAddress: session.walletAddress,
-        includeMetadata: true
+        omitMetadata: false,
+        filter: { contractStatus: 'VERIFIED', accountAddresses: [session.walletAddress] }
       })
     })
 
@@ -55,9 +56,14 @@ export async function balances() {
 
     const data = await response.json()
 
-    // Parse chain-specific response (upstream fix 6034ce6)
+    // Parse chain-specific response — handle multiple response shapes (matches seq-eco.mjs)
     const chainId = String(network.chainId)
-    const chainEntry = data.balances?.find(b => String(b.chainId || b.chainID) === chainId)
+    const chainEntry =
+      data?.chains?.[chainId] ||
+      data?.byChainId?.[chainId] ||
+      (Array.isArray(data?.chains) ? data.chains.find((x) => String(x?.chainId || x?.chainID) === chainId) : null) ||
+      (Array.isArray(data?.balances) ? data.balances.find(b => String(b.chainId || b.chainID) === chainId) : null) ||
+      (data?.balances || data?.nativeBalances ? data : null)
 
     if (!chainEntry) {
       console.log(JSON.stringify({
@@ -176,24 +182,26 @@ export async function sendNative() {
     const decimals = network.nativeCurrency?.decimals ?? 18
     const value = parseUnits(amount, decimals)
 
-    // Route through ValueForwarder (session permissions are scoped to this contract)
+    // --direct: bypass ValueForwarder and send raw native transfer (matches seq-eco.mjs)
+    const useDirectNative = hasFlag(args, '--direct') || ['1', 'true', 'yes'].includes(String(process.env.SEQ_ECO_NATIVE_DIRECT || '').toLowerCase())
+
+    // Preferred: ValueForwarder call (session permissions are scoped to this contract)
     // forwardValue(address,uint256) selector = 0x98f850f1
     const VALUE_FORWARDER = '0xABAAd93EeE2a569cF0632f39B10A9f5D734777ca'
     const selector = '0x98f850f1'
     const pad = (hex, n = 64) => String(hex).replace(/^0x/, '').padStart(n, '0')
     const data = selector + pad(to) + pad('0x' + value.toString(16))
 
-    const transactions = [{
-      to: VALUE_FORWARDER,
-      value,
-      data
-    }]
+    const transactions = useDirectNative
+      ? [{ to, value, data: '0x' }]
+      : [{ to: VALUE_FORWARDER, value, data }]
 
     const result = await runDappClientTx({
       walletName,
       chainId: network.chainId,
       transactions,
-      broadcast
+      broadcast,
+      preferNativeFee: true
     })
 
     if (!broadcast) return
@@ -279,7 +287,8 @@ export async function sendToken() {
       walletName,
       chainId: network.chainId,
       transactions,
-      broadcast
+      broadcast,
+      preferNativeFee: true
     })
 
     if (!broadcast) return
@@ -437,7 +446,8 @@ export async function swap() {
       walletName,
       chainId,
       transactions,
-      broadcast: true
+      broadcast: true,
+      preferNativeFee: true
     })
     const txHash = result.txHash
 
@@ -477,6 +487,18 @@ export async function swap() {
   }
 }
 
+// Load optional token map override from env (matches trails.mjs)
+// Format: TRAILS_TOKEN_MAP_JSON='{"137":{"USDC":{"address":"0x...","decimals":6}}}'
+function loadTokenMap() {
+  const raw = process.env.TRAILS_TOKEN_MAP_JSON || ''
+  if (!raw) return {}
+  try {
+    return JSON.parse(raw)
+  } catch {
+    throw new Error('Invalid TRAILS_TOKEN_MAP_JSON (must be valid JSON)')
+  }
+}
+
 // Helper: Get token configuration (native or ERC20)
 async function getTokenConfig({ chainId, symbol, nativeSymbol }) {
   const sym = String(symbol || '').toUpperCase().trim()
@@ -489,7 +511,14 @@ async function getTokenConfig({ chainId, symbol, nativeSymbol }) {
     }
   }
 
-  // Token Directory lookup
+  // 1) Explicit env override (matches trails.mjs)
+  const tokenMap = loadTokenMap()
+  const entry = tokenMap?.[String(chainId)]?.[sym]
+  if (entry?.address && entry.decimals != null) {
+    return { symbol: sym, address: entry.address, decimals: Number(entry.decimals) }
+  }
+
+  // 2) Token Directory lookup
   const { resolveErc20BySymbol } = await import('../../lib/token-directory.mjs')
   const token = await resolveErc20BySymbol({ chainId, symbol: sym })
   if (!token?.address || token.decimals == null) {
