@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "b0a0572fdc36",
+  "strategy": "manual-commit",
+  "branch": "feature/webhook-callback",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "cli/commands/operations.mjs",
+    "cli/commands/registry.mjs",
+    "connector-ui/package.json",
+    "lib/dapp-client.mjs",
+    "lib/storage.mjs",
+    "package.json"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b0/a0572fdc36/0/metadata.json",
+      "transcript": "/b0/a0572fdc36/0/full.jsonl",
+      "context": "/b0/a0572fdc36/0/context.md",
+      "content_hash": "/b0/a0572fdc36/0/content_hash.txt",
+      "prompt": "/b0/a0572fdc36/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 294,
+    "cache_creation_tokens": 428955,
+    "cache_read_tokens": 7796748,
+    "output_tokens": 730,
+    "api_call_count": 79
+  }
+}

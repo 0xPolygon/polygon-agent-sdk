@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "b0a0572fdc36",
+  "session_id": "4c58b72c-8439-4694-9718-a00235b307e0",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-16T13:26:24.236113Z",
+  "branch": "feature/webhook-callback",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "cli/commands/operations.mjs",
+    "cli/commands/registry.mjs",
+    "connector-ui/package.json",
+    "lib/dapp-client.mjs",
+    "lib/storage.mjs",
+    "package.json"
+  ],
+  "agent": "Claude Code",
+  "checkpoint_transcript_start": 4172,
+  "transcript_lines_at_start": 4172,
+  "token_usage": {
+    "input_tokens": 294,
+    "cache_creation_tokens": 428955,
+    "cache_read_tokens": 7796748,
+    "output_tokens": 730,
+    "api_call_count": 79
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-16T13:26:23.177813Z",
+    "agent_lines": 276,
+    "human_added": 323,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 599,
+    "agent_percentage": 46.07679465776294
+  }
+}
