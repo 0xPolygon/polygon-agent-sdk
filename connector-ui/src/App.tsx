@@ -265,6 +265,19 @@ function App() {
               })
           : []
 
+      // Contract whitelist (--contract 0x... repeatable): allow calls to specified contracts (e.g. ERC-8004 registries).
+      // Format: contracts=0xaddr1,0xaddr2
+      const contractsRaw = params.get('contracts')
+      const contractWhitelistPermissions: any[] = []
+      if (contractsRaw) {
+        const addrs = contractsRaw.split(',').map(s => (s || '').trim()).filter(Boolean)
+        for (const addr of addrs) {
+          if (/^0x[a-fA-F0-9]{40}$/.test(addr)) {
+            contractWhitelistPermissions.push({ target: addr as any, rules: [] })
+          }
+        }
+      }
+
       const polValueLimit = nativeLimit ? BigInt(Math.floor(parseFloat(nativeLimit) * 1e18)) : 2000000000000000000n
 
       const sessionConfig = {
@@ -272,7 +285,7 @@ function App() {
         // Native spend limit (chain native token)
         valueLimit: polValueLimit,
         deadline: BigInt(Math.floor(Date.now() / 1000) + 60 * 60 * 24),
-        permissions: [...basePermissions, ...oneOffErc20Permissions, ...openTokenPermissions, ...nativeFeePermission, ...feePermissions]
+        permissions: [...basePermissions, ...contractWhitelistPermissions, ...oneOffErc20Permissions, ...openTokenPermissions, ...dynamicTokenPermissions, ...nativeFeePermission, ...feePermissions]
       }
 
       // Connect will open the wallet UI (popup).
