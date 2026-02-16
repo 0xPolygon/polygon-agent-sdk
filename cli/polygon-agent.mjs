@@ -12,8 +12,12 @@ async function main() {
       const { builderSetup } = await import('./commands/builder.mjs')
       await builderSetup()
     } else if (cmd === 'wallet' && subCmd === 'create') {
-      const { walletCreate } = await import('./commands/wallet.mjs')
-      await walletCreate()
+      const { walletCreate, walletCreateAndWait } = await import('./commands/wallet.mjs')
+      if (process.argv.includes('--wait')) {
+        await walletCreateAndWait()
+      } else {
+        await walletCreate()
+      }
     } else if (cmd === 'wallet' && subCmd === 'start-session') {
       const { walletStartSession } = await import('./commands/wallet.mjs')
       await walletStartSession()
@@ -79,6 +83,7 @@ BUILDER (Get Sequence project access key):
 
 WALLET (Create ecosystem wallet):
   wallet create --name <name>           Create wallet session request
+  wallet create --name <name> --wait    Create + wait for callback (zero copy/paste)
   wallet start-session --name <name>    Start wallet session from ciphertext
   wallet list                           List all wallets
   wallet address --name <name>          Show wallet address

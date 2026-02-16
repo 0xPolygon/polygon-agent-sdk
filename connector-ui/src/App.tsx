@@ -5,6 +5,8 @@ import { DappClient, TransportMode, WebStorage, jsonReplacers, Utils, Permission
 import { Hex, Signature } from 'ox'
 import sealedbox from 'tweetnacl-sealedbox-js'
 
+import { Wallet, Copy, Check, ExternalLink, ArrowRight, AlertCircle } from 'lucide-react'
+
 import { dappOrigin, projectAccessKey, walletUrl, relayerUrl, nodesUrl } from './config'
 import { fetchBalancesAllChains, pickChainBalances, resolveChainId, resolveNetwork } from './indexer'
 import { resolveErc20Symbol } from './tokenDirectory'
@@ -95,6 +97,7 @@ function App() {
   const [callbackFailed, setCallbackFailed] = useState<boolean>(false)
   const [balances, setBalances] = useState<BalanceSummary | null>(null)
   const [feeTokens, setFeeTokens] = useState<any | null>(null)
+  const [copied, setCopied] = useState(false)
 
   // Reset local session state every time a new rid is opened.
   useEffect(() => {
@@ -354,14 +357,15 @@ function App() {
       const ciphertextB64u = b64urlEncode(sealed)
       setCiphertext(ciphertextB64u)
 
-      // Optional: auto-submit ciphertext to a one-shot callback URL (e.g. ngrok tunnel).
-      // This is client->server (Bloom) direct; do not proxy through the Worker backend.
+      // Optional: auto-submit ciphertext to a one-shot callback URL.
+      // Accepts localhost HTTP (for CLI --wait webhook) or any HTTPS URL.
+      const isLocalCallback = callbackUrl && (callbackUrl.startsWith('http://localhost:') || callbackUrl.startsWith('http://127.0.0.1:'))
+      const isSecureCallback = callbackUrl && callbackUrl.startsWith('https://')
       if (
         callbackUrl &&
         typeof callbackUrl === 'string' &&
         callbackUrl.length < 2048 &&
-        callbackUrl.startsWith('https://') &&
-        callbackUrl.includes('/seq-eco/')
+        (isLocalCallback || isSecureCallback)
       ) {
         try {
           const res = await fetch(callbackUrl, {
@@ -395,6 +399,8 @@ function App() {
   const copyCiphertext = async () => {
     if (!ciphertext) return
     await navigator.clipboard.writeText(ciphertext)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const nativeRows = (balances?.nativeBalances || []).map(b => ({
@@ -416,78 +422,257 @@ function App() {
   const allRows = [...nativeRows, ...erc20Rows]
 
   return (
-    <div className='page'>
-      <div className='card'>
-        <div className='brand'>
-          <div className='dot' />
-          <div>
-            <div className='title'>Polygon Agent Kit</div>
-            <div className='subtitle'>{network.title} · Create wallet session for agent operations</div>
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-8">
+      <div className="w-full max-w-lg mx-auto animate-scale-in">
+
+        {/* Main Card */}
+        <div className="card-glow rounded-2xl bg-surface/80 backdrop-blur-xl border border-border shadow-2xl shadow-black/40 overflow-hidden">
+
+          {/* Brand Header */}
+          <div className="px-6 pt-6 pb-5 border-b border-border">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-poly/20">
+                  <svg width="40" height="40" viewBox="0 0 360 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="360" height="360" rx="180" fill="#6C00F6"/>
+                    <path d="M218.804 99.5819L168.572 128.432V218.473L140.856 234.539L112.97 218.46V186.313L140.856 170.39L158.786 180.788V154.779L140.699 144.511L90.4795 173.687V231.399L140.869 260.418L191.088 231.399V141.371L218.974 125.291L246.846 141.371V173.374L218.974 189.597L200.887 179.107V204.986L218.804 215.319L269.519 186.47V128.432L218.804 99.5819Z" fill="white"/>
+                  </svg>
+                </div>
+                <div className="absolute inset-0 rounded-xl animate-pulse-glow" />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold text-text-primary tracking-tight">
+                  Polygon Agent Kit
+                </h1>
+                <p className="text-sm text-text-secondary mt-0.5">
+                  {network.title} &middot; Wallet Session
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div className='section'>
-          <div className='label'>Wallet</div>
-          <div className='text'>{walletUrl}</div>
-        </div>
+          {/* ======== PRE-CONNECT STATE ======== */}
+          {!walletAddress && (
+            <div className="p-6 space-y-5 animate-fade-in">
+              {/* Wallet URL */}
+              <div>
+                <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                  Wallet
+                </label>
+                <div className="mt-2 flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border">
+                  <Wallet className="w-4 h-4 text-text-secondary shrink-0" />
+                  <span className="text-sm text-text-secondary font-mono truncate">
+                    {walletUrl}
+                  </span>
+                </div>
+              </div>
 
-        {!walletAddress && (
-          <div className='section'>
-            <div className='text'>Click connect, approve the session in the Ecosystem Wallet, then copy the encrypted blob back to your CLI or agent.</div>
-            <button className='button' onClick={connect}>Connect wallet</button>
-            {error && <div className='error'>{error}</div>}
-          </div>
-        )}
+              {/* Instructions */}
+              <p className="text-sm text-text-secondary leading-relaxed">
+                Click connect, approve the session in the Ecosystem Wallet, then copy the encrypted blob back to your CLI or agent.
+              </p>
 
-        {walletAddress && (
-          <>
-            <div className='section'>
-              <div className='label'>Wallet address</div>
-              <div className='mono'>{walletAddress}</div>
+              {/* Connect Button */}
+              <button
+                className="btn-press w-full h-12 rounded-xl bg-gradient-to-r from-poly to-poly-light text-white font-semibold text-sm tracking-wide shadow-lg shadow-poly/25 hover:shadow-xl hover:shadow-poly/30 hover:brightness-110 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer border-0"
+                onClick={connect}
+              >
+                <Wallet className="w-4 h-4" />
+                Connect Wallet
+                <ArrowRight className="w-4 h-4" />
+              </button>
 
-              {balances && (
-                <div className='balances'>
-                  {allRows.map(row => (
-                    <div className='balanceRow' key={row.key}>
-                      <div className='balanceLabel'>
-                        {row.logoURI ? (
-                          <img src={row.logoURI} alt='' style={{ width: 16, height: 16, borderRadius: 999, marginRight: 8 }} />
-                        ) : null}
-                        <span>{row.symbol}</span>
-                      </div>
-                      <div className='balanceValue'>{formatUnits(row.balance, row.decimals)}</div>
-                    </div>
-                  ))}
+              {/* Error */}
+              {error && (
+                <div className="flex items-start gap-2 px-3.5 py-3 rounded-xl bg-error-glow border border-error/20 animate-slide-up">
+                  <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
+                  <p className="text-sm text-error">{error}</p>
                 </div>
               )}
             </div>
+          )}
 
-            <div className='section'>
-              <div className='label'>Next step</div>
+          {/* ======== POST-CONNECT STATE ======== */}
+          {walletAddress && (
+            <div className="p-6 space-y-5 animate-slide-up">
 
-              {callbackUrl && callbackSent ? (
-                <div className='text'>Encrypted session sent to callback. Switch back to your agent — it will confirm once the wallet session is ingested.</div>
-              ) : callbackUrl && callbackFailed ? (
-                <div className='text'>Tried to auto-send the encrypted session to callback, but the request failed. Please copy/paste the blob manually below.</div>
-              ) : callbackUrl ? (
-                <div className='text'>Sending encrypted session to callback…</div>
-              ) : (
-                <div className='text'>Copy the encrypted blob and paste it to your CLI or agent.</div>
+              {/* Wallet Address Badge */}
+              <div>
+                <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                  Connected Wallet
+                </label>
+                <div className="mt-2 flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-surface-elevated border border-border">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-poly/30 to-poly-dark/20 border border-poly/20 flex items-center justify-center shrink-0">
+                    <Wallet className="w-4 h-4 text-poly-light" />
+                  </div>
+                  <span className="text-sm text-text-primary font-mono truncate flex-1">
+                    {walletAddress}
+                  </span>
+                  <a
+                    href={`https://polygonscan.com/address/${walletAddress}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-text-muted hover:text-poly-light transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Balance Table */}
+              {balances && allRows.length > 0 && (
+                <div>
+                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                    Balances
+                  </label>
+                  <div className="mt-2 rounded-xl bg-surface-elevated border border-border overflow-hidden divide-y divide-border">
+                    {allRows.map((row, i) => (
+                      <div
+                        key={row.key}
+                        className="flex items-center justify-between px-4 py-3 hover:bg-surface-hover transition-colors opacity-0 animate-slide-up"
+                        style={{ animationDelay: `${0.1 + i * 0.05}s` }}
+                      >
+                        <div className="flex items-center gap-3">
+                          {row.logoURI ? (
+                            <img
+                              src={row.logoURI}
+                              alt=""
+                              className="w-7 h-7 rounded-full ring-1 ring-border"
+                            />
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-poly/40 to-poly-dark/30 ring-1 ring-border flex items-center justify-center">
+                              <span className="text-xs font-semibold text-text-secondary">
+                                {row.symbol.charAt(0)}
+                              </span>
+                            </div>
+                          )}
+                          <span className="text-sm font-medium text-text-primary">
+                            {row.symbol}
+                          </span>
+                        </div>
+                        <span className="text-sm font-semibold text-text-primary font-mono tabular-nums">
+                          {formatUnits(row.balance, row.decimals)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
-              {ciphertext && (!callbackUrl || callbackFailed) && (
-                <>
-                  <textarea readOnly value={ciphertext} className='textarea' />
-                  <button className='button secondary' onClick={copyCiphertext}>Copy encrypted blob</button>
-                </>
-              )}
+              {/* Divider */}
+              <div className="border-t border-border" />
 
-              {!ciphertext && <div className='hint'>No ciphertext yet.</div>}
+              {/* Next Step */}
+              <div>
+                <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
+                  Next Step
+                </label>
 
-              {error && <div className='error'>{error}</div>}
+                {/* Success: callback sent */}
+                {callbackUrl && callbackSent && (
+                  <div className="mt-3 flex items-start gap-3 px-4 py-4 rounded-xl bg-success-glow border border-success/20 animate-scale-in">
+                    <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center shrink-0">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                        <path
+                          className="check-circle"
+                          d="M5 13l4 4L19 7"
+                          stroke="#22c55e"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-success">
+                        Session encrypted &amp; sent
+                      </p>
+                      <p className="text-xs text-text-secondary mt-1">
+                        Switch back to your agent — it will confirm once the wallet session is ingested.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Callback failed */}
+                {callbackUrl && callbackFailed && (
+                  <div className="mt-3 flex items-start gap-2 px-3.5 py-3 rounded-xl bg-error-glow border border-error/20 animate-slide-up">
+                    <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
+                    <p className="text-sm text-text-secondary">
+                      Auto-send failed. Copy the encrypted blob manually below.
+                    </p>
+                  </div>
+                )}
+
+                {/* Callback in progress */}
+                {callbackUrl && !callbackSent && !callbackFailed && (
+                  <div className="mt-3 flex items-center gap-3 px-3.5 py-3 rounded-xl bg-surface-elevated border border-border">
+                    <div className="w-4 h-4 rounded-full border-2 border-poly border-t-transparent" style={{ animation: 'spin 0.8s linear infinite' }} />
+                    <p className="text-sm text-text-secondary">
+                      Sending encrypted session to callback...
+                    </p>
+                  </div>
+                )}
+
+                {/* No callback - manual copy */}
+                {!callbackUrl && ciphertext && (
+                  <p className="mt-3 text-sm text-text-secondary">
+                    Copy the encrypted blob and paste it to your CLI or agent.
+                  </p>
+                )}
+
+                {/* Ciphertext textarea + copy button */}
+                {ciphertext && (!callbackUrl || callbackFailed) && (
+                  <div className="mt-3 space-y-3 animate-slide-up" style={{ animationDelay: '0.15s' }}>
+                    <textarea
+                      readOnly
+                      value={ciphertext}
+                      className="cipher-textarea w-full h-32 px-3.5 py-3 rounded-xl bg-black/30 border border-border text-text-secondary font-mono text-xs leading-relaxed focus:outline-none focus:border-poly/40 focus:ring-1 focus:ring-poly/20 transition-all"
+                    />
+                    <button
+                      className="btn-press w-full h-11 rounded-xl bg-surface-hover border border-border text-text-primary font-medium text-sm hover:border-border-hover transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                      onClick={copyCiphertext}
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-4 h-4 text-success" />
+                          <span className="text-success">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          Copy encrypted blob
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {/* No ciphertext yet */}
+                {!ciphertext && (
+                  <p className="mt-3 text-xs text-text-muted">
+                    No ciphertext generated yet.
+                  </p>
+                )}
+
+                {/* Error */}
+                {error && (
+                  <div className="mt-3 flex items-start gap-2 px-3.5 py-3 rounded-xl bg-error-glow border border-error/20 animate-slide-up">
+                    <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
+                    <p className="text-sm text-error">{error}</p>
+                  </div>
+                )}
+              </div>
             </div>
-          </>
-        )}
+          )}
+
+          {/* Footer */}
+          <div className="px-6 py-3 border-t border-border flex items-center justify-center">
+            <span className="text-xs text-text-muted">
+              Powered by Sequence &middot; Polygon
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -3,6 +3,7 @@
 // Renamed from ingest-session → wallet start-session
 
 import fs from 'node:fs'
+import http from 'node:http'
 import nacl from 'tweetnacl'
 import sealedbox from 'tweetnacl-sealedbox-js'
 import { saveWalletSession, loadWalletSession, saveWalletRequest, loadWalletRequest, listWallets } from '../../lib/storage.mjs'
@@ -103,6 +104,95 @@ export async function walletCreate() {
   }
 }
 
+// Shared helper: decrypt ciphertext and save wallet session.
+// Used by both walletStartSession() and walletCreateAndWait().
+async function decryptAndSaveSession(name, ciphertext, rid) {
+  // Load request
+  const request = await loadWalletRequest(rid)
+  if (!request) {
+    throw new Error(`Request not found: ${rid}`)
+  }
+
+  const chain = normalizeChain(request.chain || 'polygon')
+
+  // Check if request is expired
+  const exp = Date.parse(request.expiresAt)
+  if (Number.isFinite(exp) && Date.now() > exp) {
+    throw new Error(`Request rid=${rid} is expired (expiresAt=${request.expiresAt}). Create a new request.`)
+  }
+
+  // Decrypt ciphertext with NaCl sealed box
+  const publicKey = b64urlDecode(request.publicKeyB64u)
+  const privateKey = b64urlDecode(request.privateKeyB64u)
+  const ciphertextBuf = b64urlDecode(ciphertext)
+
+  const decrypted = sealedbox.open(ciphertextBuf, publicKey, privateKey)
+  if (!decrypted) {
+    throw new Error('Failed to decrypt ciphertext')
+  }
+
+  // Parse decrypted payload (with dapp-client jsonRevivers if available)
+  let payload
+  try {
+    const { jsonRevivers } = await import('@0xsequence/dapp-client')
+    payload = JSON.parse(Buffer.from(decrypted).toString('utf8'), jsonRevivers)
+  } catch {
+    payload = JSON.parse(Buffer.from(decrypted).toString('utf8'))
+  }
+
+  const walletAddress = payload.walletAddress
+  const chainId = payload.chainId
+  const explicitSession = payload.explicitSession
+  const implicit = payload.implicit
+
+  if (!walletAddress || typeof walletAddress !== 'string') {
+    throw new Error('Missing walletAddress in payload')
+  }
+  if (!chainId || typeof chainId !== 'number') {
+    throw new Error('Missing chainId in payload')
+  }
+
+  // Verify chain matches (request stores chain name, payload has chainId)
+  const net = resolveNetwork(chain)
+  if (Number(net.chainId) !== Number(chainId)) {
+    throw new Error(`Chain mismatch: request chain=${chain} (chainId=${net.chainId}) but payload chainId=${chainId}`)
+  }
+
+  if (!explicitSession || typeof explicitSession !== 'object') {
+    throw new Error('Missing explicitSession in payload')
+  }
+  if (!explicitSession.pk || typeof explicitSession.pk !== 'string') {
+    throw new Error('Missing explicitSession.pk in payload')
+  }
+  if (!implicit?.pk || !implicit?.attestation || !implicit?.identitySignature) {
+    throw new Error('Missing implicit session in payload')
+  }
+
+  // Prepare implicit session metadata
+  const implicitMeta = {
+    guard: implicit.guard,
+    loginMethod: implicit.loginMethod,
+    userEmail: implicit.userEmail
+  }
+
+  // Save wallet session (including all session data like seq-eco does)
+  const { jsonReplacers } = await import('@0xsequence/dapp-client')
+  await saveWalletSession(name, {
+    walletAddress,
+    chainId,
+    chain,
+    explicitSession: JSON.stringify(explicitSession, jsonReplacers),
+    sessionPk: explicitSession.pk,
+    implicitPk: implicit.pk,
+    implicitMeta: JSON.stringify(implicitMeta, jsonReplacers),
+    implicitAttestation: JSON.stringify(implicit.attestation, jsonReplacers),
+    implicitIdentitySig: JSON.stringify(implicit.identitySignature, jsonReplacers),
+    createdAt: new Date().toISOString()
+  })
+
+  return { walletAddress, chainId, chain }
+}
+
 // Wallet start-session command (formerly ingest-session)
 export async function walletStartSession() {
   const args = process.argv.slice(3)
@@ -133,7 +223,6 @@ export async function walletStartSession() {
 
     // Auto-detect rid if not provided
     if (!rid) {
-      // Try to find matching request
       const requestFiles = fs.readdirSync(`${process.env.HOME}/.polygon-agent/requests`).filter(f => f.endsWith('.json'))
 
       for (const file of requestFiles) {
@@ -150,88 +239,7 @@ export async function walletStartSession() {
       }
     }
 
-    // Load request
-    const request = await loadWalletRequest(rid)
-    if (!request) {
-      throw new Error(`Request not found: ${rid}`)
-    }
-
-    const chain = normalizeChain(request.chain || 'polygon')
-
-    // Check if request is expired
-    const exp = Date.parse(request.expiresAt)
-    if (Number.isFinite(exp) && Date.now() > exp) {
-      throw new Error(`Request rid=${rid} is expired (expiresAt=${request.expiresAt}). Create a new request.`)
-    }
-
-    // Decrypt ciphertext with NaCl sealed box
-    const publicKey = b64urlDecode(request.publicKeyB64u)
-    const privateKey = b64urlDecode(request.privateKeyB64u)
-    const ciphertextBuf = b64urlDecode(ciphertext)
-
-    const decrypted = sealedbox.open(ciphertextBuf, publicKey, privateKey)
-    if (!decrypted) {
-      throw new Error('Failed to decrypt ciphertext')
-    }
-
-    // Parse decrypted payload (with dapp-client jsonRevivers if available)
-    let payload
-    try {
-      const { jsonRevivers } = await import('@0xsequence/dapp-client')
-      payload = JSON.parse(Buffer.from(decrypted).toString('utf8'), jsonRevivers)
-    } catch {
-      payload = JSON.parse(Buffer.from(decrypted).toString('utf8'))
-    }
-
-    const walletAddress = payload.walletAddress
-    const chainId = payload.chainId
-    const explicitSession = payload.explicitSession
-    const implicit = payload.implicit
-
-    if (!walletAddress || typeof walletAddress !== 'string') {
-      throw new Error('Missing walletAddress in payload')
-    }
-    if (!chainId || typeof chainId !== 'number') {
-      throw new Error('Missing chainId in payload')
-    }
-
-    // Verify chain matches (request stores chain name, payload has chainId)
-    const net = resolveNetwork(chain)
-    if (Number(net.chainId) !== Number(chainId)) {
-      throw new Error(`Chain mismatch: request chain=${chain} (chainId=${net.chainId}) but payload chainId=${chainId}`)
-    }
-
-    if (!explicitSession || typeof explicitSession !== 'object') {
-      throw new Error('Missing explicitSession in payload')
-    }
-    if (!explicitSession.pk || typeof explicitSession.pk !== 'string') {
-      throw new Error('Missing explicitSession.pk in payload')
-    }
-    if (!implicit?.pk || !implicit?.attestation || !implicit?.identitySignature) {
-      throw new Error('Missing implicit session in payload')
-    }
-
-    // Prepare implicit session metadata
-    const implicitMeta = {
-      guard: implicit.guard,
-      loginMethod: implicit.loginMethod,
-      userEmail: implicit.userEmail
-    }
-
-    // Save wallet session (including all session data like seq-eco does)
-    const { jsonReplacers } = await import('@0xsequence/dapp-client')
-    await saveWalletSession(name, {
-      walletAddress,
-      chainId,
-      chain,
-      explicitSession: JSON.stringify(explicitSession, jsonReplacers),
-      sessionPk: explicitSession.pk,
-      implicitPk: implicit.pk,
-      implicitMeta: JSON.stringify(implicitMeta, jsonReplacers),
-      implicitAttestation: JSON.stringify(implicit.attestation, jsonReplacers),
-      implicitIdentitySig: JSON.stringify(implicit.identitySignature, jsonReplacers),
-      createdAt: new Date().toISOString()
-    })
+    const { walletAddress, chainId, chain } = await decryptAndSaveSession(name, ciphertext, rid)
 
     console.log(JSON.stringify({
       ok: true,
@@ -250,6 +258,171 @@ export async function walletStartSession() {
     }, null, 2))
     process.exit(1)
   }
+}
+
+// Wallet create-and-wait command: starts temp HTTP server, waits for connector UI callback
+export async function walletCreateAndWait() {
+  const args = process.argv.slice(3)
+  const name = getArg(args, '--name')
+  const chainArg = getArg(args, '--chain') || 'polygon'
+  const timeoutSec = parseInt(getArg(args, '--timeout') || '300', 10)
+
+  if (!name) {
+    console.error(JSON.stringify({ ok: false, error: 'Missing --name parameter' }, null, 2))
+    process.exit(1)
+  }
+
+  try {
+    const chain = normalizeChain(chainArg)
+    const connectorUrl = process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL
+
+    if (!connectorUrl) {
+      throw new Error('Missing SEQUENCE_ECOSYSTEM_CONNECTOR_URL environment variable')
+    }
+
+    // Generate NaCl keypair for encryption
+    const rid = randomId(16)
+    const kp = nacl.box.keyPair()
+    const pub = b64urlEncode(kp.publicKey)
+    const priv = b64urlEncode(kp.secretKey)
+
+    const createdAt = new Date().toISOString()
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+
+    await saveWalletRequest(rid, {
+      rid,
+      walletName: name,
+      chain,
+      createdAt,
+      expiresAt,
+      publicKeyB64u: pub,
+      privateKeyB64u: priv
+    })
+
+    // Start temp HTTP server on random port (localhost only)
+    const { resolve: resolveCallback, reject: rejectCallback, promise: callbackPromise } = promiseWithResolvers()
+
+    const MAX_BODY = 65536 // 64KB
+    const server = http.createServer((req, res) => {
+      // CORS headers for all responses
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+      // Preflight
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204)
+        res.end()
+        return
+      }
+
+      // Only accept POST /callback
+      if (req.method !== 'POST' || !req.url.startsWith('/callback')) {
+        res.writeHead(404, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'Not found' }))
+        return
+      }
+
+      let body = ''
+      let size = 0
+      req.on('data', chunk => {
+        size += chunk.length
+        if (size > MAX_BODY) {
+          res.writeHead(413, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'Payload too large' }))
+          req.destroy()
+          return
+        }
+        body += chunk
+      })
+      req.on('end', () => {
+        try {
+          const data = JSON.parse(body)
+          if (!data.ciphertext || typeof data.ciphertext !== 'string') {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ error: 'Missing ciphertext in body' }))
+            return
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ ok: true, message: 'Received' }))
+          resolveCallback(data.ciphertext)
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'Invalid JSON' }))
+        }
+      })
+    })
+
+    await new Promise((resolve, reject) => {
+      server.listen(0, '127.0.0.1', () => resolve())
+      server.on('error', reject)
+    })
+    const port = server.address().port
+
+    // Build connector URL with callback
+    const url = new URL(connectorUrl)
+    url.pathname = url.pathname.replace(/\/$/, '') + '/link'
+    url.searchParams.set('rid', rid)
+    url.searchParams.set('wallet', name)
+    url.searchParams.set('pub', pub)
+    url.searchParams.set('chain', chain)
+    url.searchParams.set('callbackUrl', `http://localhost:${port}/callback`)
+
+    const projectAccessKey = getArg(args, '--access-key') || process.env.SEQUENCE_PROJECT_ACCESS_KEY
+    if (projectAccessKey) {
+      url.searchParams.set('accessKey', projectAccessKey)
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      walletName: name,
+      chain,
+      rid,
+      url: url.toString(),
+      callbackPort: port,
+      expiresAt,
+      message: `Waiting for session approval (timeout ${timeoutSec}s)... Open URL in browser.`
+    }, null, 2))
+
+    // Wait for callback or timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`Timed out waiting for callback (${timeoutSec}s)`)), timeoutSec * 1000)
+    })
+
+    let ciphertext
+    try {
+      ciphertext = await Promise.race([callbackPromise, timeoutPromise])
+    } finally {
+      server.close()
+    }
+
+    // Decrypt and save session
+    const { walletAddress, chainId, chain: resolvedChain } = await decryptAndSaveSession(name, ciphertext, rid)
+
+    console.log(JSON.stringify({
+      ok: true,
+      walletName: name,
+      walletAddress,
+      chainId,
+      chain: resolvedChain,
+      message: 'Session started successfully. Wallet ready for operations.'
+    }, null, 2))
+
+  } catch (error) {
+    console.error(JSON.stringify({
+      ok: false,
+      error: error.message,
+      stack: error.stack
+    }, null, 2))
+    process.exit(1)
+  }
+}
+
+// Promise.withResolvers polyfill (Node <22)
+function promiseWithResolvers() {
+  let resolve, reject
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej })
+  return { promise, resolve, reject }
 }
 
 // Wallet list command

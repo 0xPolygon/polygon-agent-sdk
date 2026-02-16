@@ -26,7 +26,23 @@ node cli/polygon-agent.mjs builder setup --name "MyAgent"
 export SEQUENCE_PROJECT_ACCESS_KEY=<access-key-from-phase-1>
 export SEQUENCE_DAPP_ORIGIN=<your-connector-url>
 export SEQUENCE_ECOSYSTEM_CONNECTOR_URL=<your-connector-url>
+```
 
+### Option A: Webhook Callback (Recommended)
+
+```bash
+node cli/polygon-agent.mjs wallet create --name agent-wallet --chain polygon --wait
+```
+
+The CLI starts a temporary HTTP server on localhost and outputs a URL. Open the URL in a browser, approve the session — the connector UI POSTs the encrypted session back automatically. No copy/paste needed.
+
+**Output** (after approval): `{ ok, walletAddress, chainId }`
+
+Optional: `--timeout <seconds>` to change wait time (default 300s).
+
+### Option B: Manual Ciphertext (Fallback)
+
+```bash
 # Create wallet request
 node cli/polygon-agent.mjs wallet create --name agent-wallet --chain polygon
 ```
@@ -46,6 +62,8 @@ node cli/polygon-agent.mjs wallet start-session --name agent-wallet --ciphertext
 ```
 
 **Output**: `{ ok, walletAddress, chainId }`
+
+---
 
 **Action**: Fund `walletAddress` with POL + tokens (USDC, USDT, etc.)
 
@@ -105,11 +123,12 @@ All credentials stored in: `~/.polygon-agent/`
 
 ```
 ~/.polygon-agent/
-├── builder.json          # EOA + project credentials (encrypted)
+├── .encryption-key          # AES-256-GCM key (auto-generated)
+├── builder.json             # EOA + project credentials (encrypted)
 ├── wallets/
-│   └── agent-wallet.json # Wallet session (encrypted)
+│   └── agent-wallet.json   # Wallet session (encrypted)
 └── requests/
-    └── <rid>.json        # Pending requests
+    └── <rid>.json           # Pending requests
 ```
 
 ---
@@ -119,8 +138,9 @@ All credentials stored in: `~/.polygon-agent/`
 | Phase | Command | Purpose |
 |-------|---------|---------|
 | 1 | `builder setup` | Get project access key |
-| 2 | `wallet create` | Generate session link |
-| 2 | `wallet start-session` | Import encrypted session |
+| 2 | `wallet create --wait` | Create wallet + auto-ingest session |
+| 2 | `wallet create` | Generate session link (manual flow) |
+| 2 | `wallet start-session` | Import encrypted session (manual flow) |
 | 3 | `register` | Register agent onchain (ERC-8004) |
 | 4 | `balances` | Check token balances |
 | 4 | `send-native` | Send POL/MATIC |
@@ -136,6 +156,10 @@ All credentials stored in: `~/.polygon-agent/`
 **Insufficient funds**: Check balances, fund wallet address
 
 **Transaction failed**: Check `--broadcast` flag (omit for dry-run)
+
+**Ciphertext truncated**: Use `wallet create --wait` for webhook callback
+
+**Callback timeout**: Increase with `--wait --timeout 600`
 
 ---
 
