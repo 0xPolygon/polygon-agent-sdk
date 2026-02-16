@@ -12,8 +12,8 @@
     "postinstall": "(cp -n .env.example .env) || echo already exists"
   },
   "dependencies": {
-    "@0xsequence/dapp-client": "3.0.0-beta.12",
-    "@0xsequence/wallet-primitives": "3.0.0-beta.12",
+    "@0xsequence/dapp-client": "3.0.0-beta.16",
+    "@0xsequence/wallet-primitives": "3.0.0-beta.16",
     "@tailwindcss/vite": "^4.1.18",
     "lucide-react": "^0.564.0",
     "ox": "^0.11.3",
