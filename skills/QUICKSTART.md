@@ -19,10 +19,10 @@ Outputs `accessKey` — needed for all wallet operations. Save `privateKey` for 
 ## Phase 2: Create Wallet
 
 ```bash
-export SEQUENCE_PROJECT_ACCESS_KEY=<access-key>
-export SEQUENCE_DAPP_ORIGIN=<connector-url>
-export SEQUENCE_ECOSYSTEM_CONNECTOR_URL=<connector-url>
+export SEQUENCE_PROJECT_ACCESS_KEY=<access-key-from-phase-1>
 ```
+
+`SEQUENCE_ECOSYSTEM_CONNECTOR_URL` defaults to `http://localhost:4444` (the connector-ui dev server). Override via env var if hosting elsewhere.
 
 ### Option A: Auto-Wait (Default — zero copy/paste)
 ```bash
@@ -124,7 +124,10 @@ Omit `--broadcast` for dry-run preview.
 ## Environment Variables
 
 **Required**:
-`SEQUENCE_PROJECT_ACCESS_KEY`, `SEQUENCE_DAPP_ORIGIN`, `SEQUENCE_ECOSYSTEM_CONNECTOR_URL`, `SEQUENCE_INDEXER_ACCESS_KEY`
+`SEQUENCE_PROJECT_ACCESS_KEY` (from setup), `SEQUENCE_INDEXER_ACCESS_KEY` (for balance checks)
+
+**Defaults** (override if needed):
+`SEQUENCE_ECOSYSTEM_CONNECTOR_URL` → `http://localhost:4444`
 
 **Optional**: `TRAILS_API_KEY`, `TRAILS_TOKEN_MAP_JSON`, `POLYGON_AGENT_DEBUG_FETCH=1`, `POLYGON_AGENT_DEBUG_FEE=1`
 

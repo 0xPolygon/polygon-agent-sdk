@@ -3,7 +3,7 @@
 
 import { loadWalletSession } from '../../lib/storage.mjs'
 import { runDappClientTx } from '../../lib/dapp-client.mjs'
-import { getArg, hasFlag, resolveNetwork, formatUnits, parseUnits, getIndexerUrl, getExplorerUrl } from '../../lib/utils.mjs'
+import { getArg, hasFlag, resolveNetwork, formatUnits, parseUnits, getIndexerUrl, getExplorerUrl, getRpcUrl } from '../../lib/utils.mjs'
 import { resolveErc20BySymbol } from '../../lib/token-directory.mjs'
 
 // Balances command
@@ -88,9 +88,10 @@ export async function balances() {
     }))
 
     // RPC fallback for native balance (upstream fix 722ea1b)
-    if (native.length === 0 && network.rpcUrl) {
+    const rpcUrl = getRpcUrl(network)
+    if (native.length === 0 && rpcUrl) {
       try {
-        const rpcRes = await fetch(network.rpcUrl, {
+        const rpcRes = await fetch(rpcUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -64,12 +64,12 @@ polygon-agent setup --name "MyAgent"
 ```bash
 # Step 1: Set environment variables
 export SEQUENCE_PROJECT_ACCESS_KEY=<access-key-from-phase-1>
-export SEQUENCE_DAPP_ORIGIN=https://your-connector-url
-export SEQUENCE_ECOSYSTEM_CONNECTOR_URL=https://your-connector-url
 
 # Step 2: Create wallet (starts local HTTP server, waits for callback)
 polygon-agent wallet create
 ```
+
+`SEQUENCE_ECOSYSTEM_CONNECTOR_URL` defaults to `http://localhost:4444` (the connector-ui dev server). Override via env var if hosting elsewhere.
 
 The CLI starts a temporary HTTP server on a random localhost port and outputs a URL. Open the URL in a browser, approve the session — the connector UI automatically POSTs the encrypted session back to the CLI. No copy/paste needed.
 
@@ -157,8 +157,6 @@ Optional: `--timeout <seconds>` to change the wait timeout (default 300s / 5 min
 ```bash
 # Step 1: Set environment variables
 export SEQUENCE_PROJECT_ACCESS_KEY=<access-key-from-phase-1>
-export SEQUENCE_DAPP_ORIGIN=https://your-connector-url
-export SEQUENCE_ECOSYSTEM_CONNECTOR_URL=https://your-connector-url
 
 # Step 2: Create wallet session request (manual mode)
 polygon-agent wallet create --no-wait
@@ -356,15 +354,14 @@ Legacy aliases: `register`, `agent-wallet`, `agent-metadata`, `reputation`, `giv
 
 | Variable | Purpose | When |
 |----------|---------|------|
-| `SEQUENCE_PROJECT_ACCESS_KEY` | Project access key | Wallet creation |
-| `SEQUENCE_DAPP_ORIGIN` | Connector origin | Wallet creation |
-| `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | Connector URL | Wallet creation |
+| `SEQUENCE_PROJECT_ACCESS_KEY` | Project access key (from `setup`) | Wallet creation, swaps |
 | `SEQUENCE_INDEXER_ACCESS_KEY` | Indexer API key | Balance checks |
 
 ### Optional
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
+| `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | Connector UI URL for wallet creation | `http://localhost:4444` |
 | `SEQUENCE_BUILDER_API_URL` | Builder API endpoint | `https://api.sequence.build` |
 | `SEQUENCE_INDEXER_URL` | Indexer URL override | `https://indexer.sequence.app/rpc/IndexerGateway/...` |
 | `SEQUENCE_ECOSYSTEM_WALLET_URL` | Ecosystem wallet URL | `https://acme-wallet.ecosystem-demo.xyz` |

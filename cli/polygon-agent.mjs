@@ -149,9 +149,8 @@ AGENT (ERC-8004 Registry):
 
 Environment Variables:
   SEQUENCE_PROJECT_ACCESS_KEY         Project access key (from setup)
-  SEQUENCE_DAPP_ORIGIN                Connector URL for wallet creation
-  SEQUENCE_ECOSYSTEM_CONNECTOR_URL    Connector URL for wallet creation
   SEQUENCE_INDEXER_ACCESS_KEY         Indexer key for balance checks
+  SEQUENCE_ECOSYSTEM_CONNECTOR_URL    Connector URL (default: http://localhost:4444)
 
 Debug:
   POLYGON_AGENT_DEBUG_FETCH=1         Log HTTP requests to ~/.polygon-agent/fetch-debug.log
