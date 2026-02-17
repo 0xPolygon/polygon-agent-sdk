@@ -1,175 +1,40 @@
-* { box-sizing: border-box; }
-
-:root {
-  --poly: #8247e5;
-  --bg: #0b0b12;
-  --card: rgba(255, 255, 255, 0.06);
-  --border: rgba(255, 255, 255, 0.12);
-  --text: rgba(255, 255, 255, 0.92);
-  --muted: rgba(255, 255, 255, 0.68);
+/* Animated gradient border for the main card */
+.card-glow {
+  position: relative;
+}
+.card-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(130, 71, 229, 0.4),
+    rgba(130, 71, 229, 0.1) 30%,
+    transparent 50%,
+    rgba(130, 71, 229, 0.1) 70%,
+    rgba(130, 71, 229, 0.3)
+  );
+  z-index: -1;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  padding: 1px;
 }
 
-body {
-  margin: 0;
-  background: radial-gradient(1200px 600px at 20% 0%, rgba(130, 71, 229, 0.28), transparent 60%),
-    radial-gradient(900px 500px at 80% 20%, rgba(130, 71, 229, 0.16), transparent 55%),
-    var(--bg);
-  color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
-    "Segoe UI Emoji";
+/* SVG checkmark draw animation */
+.check-circle {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: check-draw 0.4s ease-out 0.2s forwards;
 }
 
-.page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 16px;
+/* Button press effect */
+.btn-press:active {
+  transform: scale(0.98);
 }
 
-.card {
-  width: 100%;
-  max-width: 720px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
-  padding: 24px;
-  backdrop-filter: blur(10px);
-}
-
-.brand {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  margin-bottom: 18px;
-}
-
-.dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  background: var(--poly);
-  box-shadow: 0 0 0 6px rgba(130, 71, 229, 0.18);
-}
-
-.title {
-  font-size: 20px;
-  font-weight: 650;
-  letter-spacing: 0.2px;
-}
-
-.subtitle {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
-.section {
-  margin-top: 18px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.label {
-  font-size: 12px;
-  color: var(--muted);
-  margin-bottom: 10px;
-}
-
-.input {
-  width: 100%;
-  height: 54px;
-  font-size: 18px;
-  padding: 0 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--text);
-  outline: none;
-}
-
-.input:focus {
-  border-color: rgba(130, 71, 229, 0.65);
-  box-shadow: 0 0 0 4px rgba(130, 71, 229, 0.18);
-}
-
-.button {
-  margin-top: 12px;
-  width: 100%;
-  height: 46px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(130, 71, 229, 0.9);
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.button.secondary {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 14px;
-  padding: 10px 12px;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  overflow-x: auto;
-}
-
-.text {
-  font-size: 14px;
-  color: var(--muted);
-  margin-bottom: 10px;
-}
-
-.textarea {
-  width: 100%;
-  height: 150px;
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 12px;
-}
-
-.balances {
-  margin-top: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.18);
-  border-radius: 12px;
-  padding: 10px 12px;
-}
-
-.balanceRow {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
-}
-
-.balanceLabel {
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-}
-
-.balanceValue {
-  font-weight: 650;
-}
-
-.hint {
-  margin-top: 10px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.error {
-  margin-top: 10px;
-  font-size: 13px;
-  color: #ff6b6b;
+/* Cipher textarea */
+.cipher-textarea {
+  resize: none;
+  scrollbar-width: thin;
 }
