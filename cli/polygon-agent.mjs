@@ -8,17 +8,22 @@ const subCmd = process.argv[3]
 
 async function main() {
   try {
-    if (cmd === 'builder' && subCmd === 'setup') {
+    // === SETUP ===
+    // `setup` is a shorthand alias for `builder setup`
+    if (cmd === 'setup' || (cmd === 'builder' && subCmd === 'setup')) {
       const { builderSetup } = await import('./commands/builder.mjs')
       await builderSetup()
+
+    // === WALLET ===
     } else if (cmd === 'wallet' && subCmd === 'create') {
       const { walletCreate, walletCreateAndWait } = await import('./commands/wallet.mjs')
-      if (process.argv.includes('--wait')) {
-        await walletCreateAndWait()
-      } else {
+      // --wait is now the default (recommended flow). Use --no-wait for manual URL-only mode.
+      if (process.argv.includes('--no-wait')) {
         await walletCreate()
+      } else {
+        await walletCreateAndWait()
       }
-    } else if (cmd === 'wallet' && subCmd === 'start-session') {
+    } else if (cmd === 'wallet' && (subCmd === 'start-session' || subCmd === 'import')) {
       const { walletStartSession } = await import('./commands/wallet.mjs')
       await walletStartSession()
     } else if (cmd === 'wallet' && subCmd === 'list') {
@@ -30,6 +35,8 @@ async function main() {
     } else if (cmd === 'wallet' && subCmd === 'remove') {
       const { walletRemove } = await import('./commands/wallet.mjs')
       await walletRemove()
+
+    // === OPERATIONS ===
     } else if (cmd === 'balances') {
       const { balances } = await import('./commands/operations.mjs')
       await balances()
@@ -45,6 +52,28 @@ async function main() {
     } else if (cmd === 'swap') {
       const { swap } = await import('./commands/operations.mjs')
       await swap()
+
+    // === AGENT SUBCOMMAND GROUP ===
+    } else if (cmd === 'agent' && subCmd === 'register') {
+      const { registerAgent } = await import('./commands/registry.mjs')
+      await registerAgent()
+    } else if (cmd === 'agent' && subCmd === 'wallet') {
+      const { getAgentWallet } = await import('./commands/registry.mjs')
+      await getAgentWallet()
+    } else if (cmd === 'agent' && subCmd === 'metadata') {
+      const { getMetadata } = await import('./commands/registry.mjs')
+      await getMetadata()
+    } else if (cmd === 'agent' && subCmd === 'reputation') {
+      const { getReputation } = await import('./commands/registry.mjs')
+      await getReputation()
+    } else if (cmd === 'agent' && subCmd === 'feedback') {
+      const { giveFeedback } = await import('./commands/registry.mjs')
+      await giveFeedback()
+    } else if (cmd === 'agent' && subCmd === 'reviews') {
+      const { readAllFeedback } = await import('./commands/registry.mjs')
+      await readAllFeedback()
+
+    // === LEGACY ALIASES (backward compatibility) ===
     } else if (cmd === 'register') {
       const { registerAgent } = await import('./commands/registry.mjs')
       await registerAgent()
@@ -74,58 +103,58 @@ async function main() {
 
 function showHelp() {
   console.log(`
-Polygon Agent Kit - Complete agent development toolkit
+Polygon Agent Kit - Agent-first blockchain toolkit for Polygon
 
 Usage: polygon-agent <command> [options]
 
-BUILDER (Get Sequence project access key):
-  builder setup --name <name>           One-command setup (EOA + auth + project)
+SETUP:
+  setup --name <name>                 One-command project setup (EOA + auth + access key)
 
-WALLET (Create ecosystem wallet):
-  wallet create --name <name>           Create wallet session request
-  wallet create --name <name> --wait    Create + wait for callback (zero copy/paste)
-  wallet start-session --name <name>    Start wallet session from ciphertext
-  wallet list                           List all wallets
-  wallet address --name <name>          Show wallet address
-  wallet remove --name <name>           Remove wallet
+WALLET:
+  wallet create [--name <name>]       Create wallet (auto-waits for approval by default)
+  wallet create --no-wait             Generate session URL only (manual flow)
+  wallet import --ciphertext <blob>   Import session from ciphertext (alias: start-session)
+  wallet list                         List all wallets
+  wallet address [--name <name>]      Show wallet address
+  wallet remove [--name <name>]       Remove wallet
 
-  Session permission options (for wallet create):
-    --native-limit <amount>             POL spending limit (e.g. 1.5)
-    --usdc-limit <amount>               USDC spending limit (e.g. 50)
-    --usdt-limit <amount>               USDT spending limit (e.g. 50)
-    --token-limit <SYM:AMT>             Token limit, repeatable (e.g. WETH:0.1)
-    --usdc-to <addr> --usdc-amount <n>  One-off USDC transfer (fixed recipient)
-    --contract <addr>                   Whitelist contract, repeatable
+  Defaults: --name main, --chain polygon
 
-OPERATIONS (Token & swap):
-  balances --wallet <name>              Check token balances
-  send --wallet <name> --to <addr>      Send native token (auto-detect)
-  send-native --wallet <name> --to ...  Send native token (POL/MATIC)
-    --direct                            Bypass ValueForwarder (raw native send)
-  send-token --wallet <name> --symbol   Send ERC20 by symbol
-  swap --wallet <name> --from --to      Execute DEX swap
+  Session permissions (for wallet create):
+    --native-limit <amount>           POL spending limit
+    --usdc-limit <amount>             USDC spending limit
+    --usdt-limit <amount>             USDT spending limit
+    --token-limit <SYM:AMT>           Token limit, repeatable (e.g. WETH:0.1)
+    --contract <addr>                 Whitelist contract, repeatable
 
+OPERATIONS:
+  balances [--wallet <name>]          Check token balances
+  send --to <addr> --amount <num>     Send native token (auto-detect with --symbol for ERC20)
+  send-native --to <addr> --amount    Send native token (explicit)
+  send-token --symbol <SYM> --to ...  Send ERC20 by symbol
+  swap --from <SYM> --to <SYM>        DEX swap via Trails API
+
+  Defaults: --wallet main, --chain polygon
   All send/swap commands support: --broadcast (execute), --chain <name|id>
 
-REGISTRY (ERC-8004 on Polygon):
-  register --wallet <name> --name <n>   Register agent identity
-  agent-wallet --agent-id <id>          Get agent payment wallet
-  agent-metadata --agent-id <id> --key  Get agent metadata
-  reputation --agent-id <id>            Get agent reputation score
-  give-feedback --wallet <name> --agent-id <id> --value <score>  Submit feedback
-  read-feedback --agent-id <id>         Read all agent feedback
+AGENT (ERC-8004 Registry):
+  agent register --name <agent-name>  Register agent identity
+  agent wallet --agent-id <id>        Get agent payment wallet
+  agent metadata --agent-id <id>      Get agent metadata
+  agent reputation --agent-id <id>    Get reputation score
+  agent feedback --agent-id <id>      Submit feedback (--value <score>)
+  agent reviews --agent-id <id>       Read all feedback
+
+  Defaults: --wallet main
 
 Environment Variables:
-  SEQUENCE_PROJECT_ACCESS_KEY           Project access key (from builder setup)
-  SEQUENCE_DAPP_ORIGIN                  Connector URL for wallet creation
-  SEQUENCE_INDEXER_ACCESS_KEY           Indexer key for balance checks
-  TRAILS_TOKEN_MAP_JSON                 Token address overrides for swap (JSON)
+  SEQUENCE_PROJECT_ACCESS_KEY         Project access key (from setup)
+  SEQUENCE_INDEXER_ACCESS_KEY         Indexer key for balance checks
+  SEQUENCE_ECOSYSTEM_CONNECTOR_URL    Connector URL (default: http://localhost:4444)
 
 Debug:
-  POLYGON_AGENT_DEBUG_FETCH=1           Log all HTTP requests to ~/.polygon-agent/fetch-debug.log
-  POLYGON_AGENT_DEBUG_FEE=1             Dump fee options to stderr before sending
-
-For detailed help: polygon-agent <command> --help
+  POLYGON_AGENT_DEBUG_FETCH=1         Log HTTP requests to ~/.polygon-agent/fetch-debug.log
+  POLYGON_AGENT_DEBUG_FEE=1           Dump fee options to stderr
 `)
   process.exit(cmd ? 1 : 0)
 }

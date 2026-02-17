@@ -7,7 +7,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Contract, Interface } from 'ethers'
 import { runDappClientTx } from '../../lib/dapp-client.mjs'
-import { getArg, hasFlag, resolveNetwork, formatUnits, getExplorerUrl } from '../../lib/utils.mjs'
+import { getArg, hasFlag, resolveNetwork, formatUnits, getExplorerUrl, getRpcUrl } from '../../lib/utils.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -26,16 +26,11 @@ const REPUTATION_ABI = JSON.parse(
 // Register agent on IdentityRegistry
 export async function registerAgent() {
   const args = process.argv.slice(2)
-  const walletName = getArg(args, '--wallet')
+  const walletName = getArg(args, '--wallet') || 'main'
   const agentName = getArg(args, '--name')
   const agentURI = getArg(args, '--agent-uri') || getArg(args, '--uri')
   const metadataStr = getArg(args, '--metadata')
   const broadcast = hasFlag(args, '--broadcast')
-
-  if (!walletName) {
-    console.error(JSON.stringify({ ok: false, error: 'Missing --wallet parameter' }, null, 2))
-    process.exit(1)
-  }
 
   try {
     const iface = new Interface(IDENTITY_ABI)
@@ -122,7 +117,7 @@ export async function getAgentWallet() {
   try {
     const network = resolveNetwork('polygon')
     const { JsonRpcProvider } = await import('ethers')
-    const provider = new JsonRpcProvider(network.rpcUrl)
+    const provider = new JsonRpcProvider(getRpcUrl(network))
 
     const contract = new Contract(IDENTITY_REGISTRY, IDENTITY_ABI, provider)
     const walletAddress = await contract.getAgentWallet(agentId)
@@ -157,7 +152,7 @@ export async function getMetadata() {
   try {
     const network = resolveNetwork('polygon')
     const { JsonRpcProvider } = await import('ethers')
-    const provider = new JsonRpcProvider(network.rpcUrl)
+    const provider = new JsonRpcProvider(getRpcUrl(network))
 
     const contract = new Contract(IDENTITY_REGISTRY, IDENTITY_ABI, provider)
     const valueBytes = await contract.getMetadata(agentId, key)
@@ -194,7 +189,7 @@ export async function getReputation() {
   try {
     const network = resolveNetwork('polygon')
     const { JsonRpcProvider } = await import('ethers')
-    const provider = new JsonRpcProvider(network.rpcUrl)
+    const provider = new JsonRpcProvider(getRpcUrl(network))
 
     const contract = new Contract(REPUTATION_REGISTRY, REPUTATION_ABI, provider)
 
@@ -234,7 +229,7 @@ export async function getReputation() {
 // Give feedback to an agent
 export async function giveFeedback() {
   const args = process.argv.slice(2)
-  const walletName = getArg(args, '--wallet')
+  const walletName = getArg(args, '--wallet') || 'main'
   const agentId = getArg(args, '--agent-id')
   const value = getArg(args, '--value')
   const tag1 = getArg(args, '--tag1') || ''
@@ -243,10 +238,10 @@ export async function giveFeedback() {
   const feedbackURI = getArg(args, '--feedback-uri') || ''
   const broadcast = hasFlag(args, '--broadcast')
 
-  if (!walletName || !agentId || !value) {
+  if (!agentId || !value) {
     console.error(JSON.stringify({
       ok: false,
-      error: 'Missing required parameters: --wallet, --agent-id, --value'
+      error: 'Missing required parameters: --agent-id, --value'
     }, null, 2))
     process.exit(1)
   }
@@ -321,7 +316,7 @@ export async function readAllFeedback() {
   try {
     const network = resolveNetwork('polygon')
     const { JsonRpcProvider } = await import('ethers')
-    const provider = new JsonRpcProvider(network.rpcUrl)
+    const provider = new JsonRpcProvider(getRpcUrl(network))
 
     const contract = new Contract(REPUTATION_REGISTRY, REPUTATION_ABI, provider)
 

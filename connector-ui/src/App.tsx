@@ -467,22 +467,9 @@ function App() {
           {/* ======== PRE-CONNECT STATE ======== */}
           {!walletAddress && (
             <div className="p-6 space-y-5 animate-fade-in">
-              {/* Wallet URL */}
-              <div>
-                <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                  Wallet
-                </label>
-                <div className="mt-2 flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-border">
-                  <Wallet className="w-4 h-4 text-text-secondary shrink-0" />
-                  <span className="text-sm text-text-secondary font-mono truncate">
-                    {walletUrl}
-                  </span>
-                </div>
-              </div>
-
               {/* Instructions */}
               <p className="text-sm text-text-secondary leading-relaxed">
-                Click connect, approve the session in the Ecosystem Wallet, then copy the encrypted blob back to your CLI or agent.
+                Click connect, approve the session for your agent, then the encrypted blob will be sent back to your agent to create a secure session.
               </p>
 
               {/* Connect Button */}

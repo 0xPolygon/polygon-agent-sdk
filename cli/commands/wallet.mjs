@@ -66,22 +66,13 @@ function applySessionPermissionParams(url, args) {
 // Wallet create command (formerly create-request)
 export async function walletCreate() {
   const args = process.argv.slice(3)
-  const name = getArg(args, '--name')
+  const name = getArg(args, '--name') || 'main'
   const chainArg = getArg(args, '--chain') || 'polygon'
-
-  if (!name) {
-    console.error(JSON.stringify({ ok: false, error: 'Missing --name parameter' }, null, 2))
-    process.exit(1)
-  }
 
   try {
     // Normalize chain name (don't resolve to Network object yet - that happens in wallet start-session)
     const chain = normalizeChain(chainArg)
-    const connectorUrl = process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL
-
-    if (!connectorUrl) {
-      throw new Error('Missing SEQUENCE_ECOSYSTEM_CONNECTOR_URL environment variable')
-    }
+    const connectorUrl = process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL || 'http://localhost:4444'
 
     // Generate NaCl keypair for encryption
     const rid = randomId(16)
@@ -229,17 +220,12 @@ async function decryptAndSaveSession(name, ciphertext, rid) {
   return { walletAddress, chainId, chain }
 }
 
-// Wallet start-session command (formerly ingest-session)
+// Wallet start-session / import command (formerly ingest-session)
 export async function walletStartSession() {
   const args = process.argv.slice(3)
-  const name = getArg(args, '--name')
+  const name = getArg(args, '--name') || 'main'
   let ciphertext = getArg(args, '--ciphertext')
   let rid = getArg(args, '--rid')
-
-  if (!name) {
-    console.error(JSON.stringify({ ok: false, error: 'Missing --name parameter' }, null, 2))
-    process.exit(1)
-  }
 
   if (!ciphertext) {
     console.error(JSON.stringify({ ok: false, error: 'Missing --ciphertext parameter' }, null, 2))
@@ -299,22 +285,13 @@ export async function walletStartSession() {
 // Wallet create-and-wait command: starts temp HTTP server, waits for connector UI callback
 export async function walletCreateAndWait() {
   const args = process.argv.slice(3)
-  const name = getArg(args, '--name')
+  const name = getArg(args, '--name') || 'main'
   const chainArg = getArg(args, '--chain') || 'polygon'
   const timeoutSec = parseInt(getArg(args, '--timeout') || '300', 10)
 
-  if (!name) {
-    console.error(JSON.stringify({ ok: false, error: 'Missing --name parameter' }, null, 2))
-    process.exit(1)
-  }
-
   try {
     const chain = normalizeChain(chainArg)
-    const connectorUrl = process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL
-
-    if (!connectorUrl) {
-      throw new Error('Missing SEQUENCE_ECOSYSTEM_CONNECTOR_URL environment variable')
-    }
+    const connectorUrl = process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL || 'http://localhost:4444'
 
     // Generate NaCl keypair for encryption
     const rid = randomId(16)
@@ -499,12 +476,7 @@ export async function walletList() {
 // Wallet address command
 export async function walletAddress() {
   const args = process.argv.slice(3)
-  const name = getArg(args, '--name')
-
-  if (!name) {
-    console.error(JSON.stringify({ ok: false, error: 'Missing --name parameter' }, null, 2))
-    process.exit(1)
-  }
+  const name = getArg(args, '--name') || 'main'
 
   try {
     const session = await loadWalletSession(name)
@@ -532,12 +504,7 @@ export async function walletAddress() {
 // Wallet remove command
 export async function walletRemove() {
   const args = process.argv.slice(3)
-  const name = getArg(args, '--name')
-
-  if (!name) {
-    console.error(JSON.stringify({ ok: false, error: 'Missing --name parameter' }, null, 2))
-    process.exit(1)
-  }
+  const name = getArg(args, '--name') || 'main'
 
   try {
     const { deleteWallet } = await import('../../lib/storage.mjs')

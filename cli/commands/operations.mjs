@@ -3,18 +3,13 @@
 
 import { loadWalletSession } from '../../lib/storage.mjs'
 import { runDappClientTx } from '../../lib/dapp-client.mjs'
-import { getArg, hasFlag, resolveNetwork, formatUnits, parseUnits, getIndexerUrl, getExplorerUrl } from '../../lib/utils.mjs'
+import { getArg, hasFlag, resolveNetwork, formatUnits, parseUnits, getIndexerUrl, getExplorerUrl, getRpcUrl } from '../../lib/utils.mjs'
 import { resolveErc20BySymbol } from '../../lib/token-directory.mjs'
 
 // Balances command
 export async function balances() {
   const args = process.argv.slice(2)
-  const walletName = getArg(args, '--wallet')
-
-  if (!walletName) {
-    console.error(JSON.stringify({ ok: false, error: 'Missing --wallet parameter' }, null, 2))
-    process.exit(1)
-  }
+  const walletName = getArg(args, '--wallet') || 'main'
 
   try {
     // Load wallet session
@@ -93,9 +88,10 @@ export async function balances() {
     }))
 
     // RPC fallback for native balance (upstream fix 722ea1b)
-    if (native.length === 0 && network.rpcUrl) {
+    const rpcUrl = getRpcUrl(network)
+    if (native.length === 0 && rpcUrl) {
       try {
-        const rpcRes = await fetch(network.rpcUrl, {
+        const rpcRes = await fetch(rpcUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -159,13 +155,13 @@ export async function balances() {
 // Send native token command
 export async function sendNative() {
   const args = process.argv.slice(2)
-  const walletName = getArg(args, '--wallet')
+  const walletName = getArg(args, '--wallet') || 'main'
   const to = getArg(args, '--to')
   const amount = getArg(args, '--amount')
   const broadcast = hasFlag(args, '--broadcast')
 
-  if (!walletName || !to || !amount) {
-    console.error(JSON.stringify({ ok: false, error: 'Missing required parameters: --wallet, --to, --amount' }, null, 2))
+  if (!to || !amount) {
+    console.error(JSON.stringify({ ok: false, error: 'Missing required parameters: --to, --amount' }, null, 2))
     process.exit(1)
   }
 
@@ -232,7 +228,7 @@ export async function sendNative() {
 // Send token command (by symbol or address)
 export async function sendToken() {
   const args = process.argv.slice(2)
-  const walletName = getArg(args, '--wallet')
+  const walletName = getArg(args, '--wallet') || 'main'
   const symbol = getArg(args, '--symbol')
   const tokenAddress = getArg(args, '--token')
   const decimalsArg = getArg(args, '--decimals')
@@ -240,8 +236,8 @@ export async function sendToken() {
   const amount = getArg(args, '--amount')
   const broadcast = hasFlag(args, '--broadcast')
 
-  if (!walletName || !to || !amount) {
-    console.error(JSON.stringify({ ok: false, error: 'Missing required parameters: --wallet, --to, --amount' }, null, 2))
+  if (!to || !amount) {
+    console.error(JSON.stringify({ ok: false, error: 'Missing required parameters: --to, --amount' }, null, 2))
     process.exit(1)
   }
 
@@ -322,17 +318,17 @@ export async function sendToken() {
 // Swap command (Trails API)
 export async function swap() {
   const args = process.argv.slice(2)
-  const walletName = getArg(args, '--wallet')
+  const walletName = getArg(args, '--wallet') || 'main'
   const fromSymbol = getArg(args, '--from')
   const toSymbol = getArg(args, '--to')
   const amount = getArg(args, '--amount')
   const slippageArg = getArg(args, '--slippage')
   const broadcast = hasFlag(args, '--broadcast')
 
-  if (!walletName || !fromSymbol || !toSymbol || !amount) {
+  if (!fromSymbol || !toSymbol || !amount) {
     console.error(JSON.stringify({
       ok: false,
-      error: 'Missing required parameters: --wallet, --from, --to, --amount'
+      error: 'Missing required parameters: --from, --to, --amount'
     }, null, 2))
     process.exit(1)
   }

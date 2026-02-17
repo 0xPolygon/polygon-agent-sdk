@@ -8,7 +8,7 @@ Session-based wallet connector for Polygon Agent Kit agents. Creates secure encr
 - **Encrypted Export**: Encrypts session credentials using NaCl sealed-box for secure CLI/agent ingest
 - **Token Limits**: Supports native (POL) and ERC20 spending limits (USDC, USDT, custom tokens)
 - **Balance Display**: Shows wallet balances after connection
-- **Callback Support**: Optional automatic callback delivery to agent endpoints
+- **Callback Support**: Automatic callback delivery to the CLI (default mode)
 
 ## Quickstart
 
@@ -30,8 +30,18 @@ To provide your own keys from [Sequence Builder](https://sequence.build/), edit 
 
 ## Usage with Polygon Agent Kit CLI
 
-1. Run `polygon-agent wallet create --name myagent` to generate a session link
+### Auto-Wait (Default — zero copy/paste)
+
+```bash
+polygon-agent wallet create
+```
+
+The CLI starts a local HTTP server and outputs a URL. Open the URL in browser, approve the session — the connector UI POSTs the encrypted session back automatically.
+
+### Manual Flow
+
+1. Run `polygon-agent wallet create --no-wait` to generate a session link
 2. Open the link in browser
 3. Click "Connect wallet" and approve in Ecosystem Wallet
 4. Copy the encrypted blob
-5. Run `polygon-agent wallet start-session --name myagent --ciphertext @/tmp/session.txt`
+5. Run `polygon-agent wallet import --ciphertext @/tmp/session.txt`

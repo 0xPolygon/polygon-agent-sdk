@@ -7,10 +7,10 @@ description: Quick start guide for Polygon Agent Kit. Get project access key, cr
 
 **Goal**: Zero to operational agent in 4 phases.
 
-## Phase 1: Builder Setup
+## Phase 1: Setup
 
 ```bash
-node cli/polygon-agent.mjs builder setup --name "MyAgent"
+polygon-agent setup --name "MyAgent"
 ```
 Outputs `accessKey` — needed for all wallet operations. Save `privateKey` for backup.
 
@@ -19,22 +19,22 @@ Outputs `accessKey` — needed for all wallet operations. Save `privateKey` for 
 ## Phase 2: Create Wallet
 
 ```bash
-export SEQUENCE_PROJECT_ACCESS_KEY=<access-key>
-export SEQUENCE_DAPP_ORIGIN=<connector-url>
-export SEQUENCE_ECOSYSTEM_CONNECTOR_URL=<connector-url>
+export SEQUENCE_PROJECT_ACCESS_KEY=<access-key-from-phase-1>
 ```
 
-### Option A: Webhook (Recommended)
+`SEQUENCE_ECOSYSTEM_CONNECTOR_URL` defaults to `http://localhost:4444` (the connector-ui dev server). Override via env var if hosting elsewhere.
+
+### Option A: Auto-Wait (Default — zero copy/paste)
 ```bash
-node cli/polygon-agent.mjs wallet create --name agent-wallet --chain polygon --wait
+polygon-agent wallet create
 ```
 Opens URL in browser → approve session → CLI auto-ingests. No copy/paste.
 
 ### Option B: Manual
 ```bash
-node cli/polygon-agent.mjs wallet create --name agent-wallet --chain polygon
+polygon-agent wallet create --no-wait
 # Open output URL, approve, copy blob:
-node cli/polygon-agent.mjs wallet start-session --name agent-wallet --ciphertext @/tmp/session.txt
+polygon-agent wallet import --ciphertext @/tmp/session.txt
 ```
 
 ### Session Permissions
@@ -42,7 +42,7 @@ node cli/polygon-agent.mjs wallet start-session --name agent-wallet --ciphertext
 Control what the session can do. Without these, the agent gets bare-bones defaults and may not be able to transact.
 
 ```bash
-node cli/polygon-agent.mjs wallet create --name agent-wallet --chain polygon --wait \
+polygon-agent wallet create \
   --native-limit 5 \
   --usdc-limit 100 \
   --usdt-limit 50 \
@@ -67,7 +67,7 @@ node cli/polygon-agent.mjs wallet create --name agent-wallet --chain polygon --w
 ## Phase 3: Register Agent (ERC-8004)
 
 ```bash
-node cli/polygon-agent.mjs register --wallet agent-wallet --name "MyAgent" --broadcast
+polygon-agent agent register --name "MyAgent" --broadcast
 ```
 Mints ERC-721 NFT with `agentId`. Check transaction for Registered event.
 
@@ -78,19 +78,19 @@ Mints ERC-721 NFT with `agentId`. Check transaction for Registered event.
 ```bash
 # Balances
 export SEQUENCE_INDEXER_ACCESS_KEY=<indexer-key>
-node cli/polygon-agent.mjs balances --wallet agent-wallet
+polygon-agent balances
 
 # Send POL (via ValueForwarder)
-node cli/polygon-agent.mjs send-native --wallet agent-wallet --to 0x... --amount 1.0 --broadcast
+polygon-agent send --to 0x... --amount 1.0 --broadcast
 
 # Send POL direct (bypass ValueForwarder)
-node cli/polygon-agent.mjs send-native --wallet agent-wallet --to 0x... --amount 1.0 --broadcast --direct
+polygon-agent send-native --to 0x... --amount 1.0 --broadcast --direct
 
 # Send ERC20
-node cli/polygon-agent.mjs send-token --wallet agent-wallet --symbol USDC --to 0x... --amount 10 --broadcast
+polygon-agent send --symbol USDC --to 0x... --amount 10 --broadcast
 
 # DEX Swap
-node cli/polygon-agent.mjs swap --wallet agent-wallet --from USDC --to USDT --amount 5 --slippage 0.005 --broadcast
+polygon-agent swap --from USDC --to USDT --amount 5 --slippage 0.005 --broadcast
 ```
 
 Omit `--broadcast` for dry-run preview.
@@ -101,26 +101,33 @@ Omit `--broadcast` for dry-run preview.
 
 | Command | Purpose |
 |---------|---------|
-| `builder setup` | Get project access key |
-| `wallet create --wait` | Create wallet + auto-ingest session |
-| `wallet create` | Generate session link (manual flow) |
-| `wallet start-session` | Import encrypted session |
+| `setup` | Get project access key |
+| `wallet create` | Create wallet (auto-waits for approval) |
+| `wallet create --no-wait` | Generate session link (manual flow) |
+| `wallet import` | Import encrypted session |
 | `wallet list` | List configured wallets |
-| `register` | Register agent onchain (ERC-8004) |
+| `agent register` | Register agent onchain (ERC-8004) |
 | `balances` | Check token balances |
-| `send-native [--direct]` | Send POL/MATIC |
-| `send-token` | Send ERC20 by symbol |
+| `send [--symbol SYM]` | Send native or ERC20 |
+| `send-native [--direct]` | Send POL/MATIC (explicit) |
+| `send-token` | Send ERC20 by symbol (explicit) |
 | `swap` | DEX swap via Trails |
-| `agent-wallet` | Get agent's payment wallet |
-| `reputation` | Get agent reputation score |
-| `give-feedback` | Submit on-chain feedback |
+| `agent wallet` | Get agent's payment wallet |
+| `agent reputation` | Get agent reputation score |
+| `agent feedback` | Submit on-chain feedback |
+| `agent reviews` | Read all agent feedback |
+
+**Smart defaults**: `--wallet main`, `--chain polygon`, `--name main`. Most commands need zero flags.
 
 ---
 
 ## Environment Variables
 
 **Required**:
-`SEQUENCE_PROJECT_ACCESS_KEY`, `SEQUENCE_DAPP_ORIGIN`, `SEQUENCE_ECOSYSTEM_CONNECTOR_URL`, `SEQUENCE_INDEXER_ACCESS_KEY`
+`SEQUENCE_PROJECT_ACCESS_KEY` (from setup), `SEQUENCE_INDEXER_ACCESS_KEY` (for balance checks)
+
+**Defaults** (override if needed):
+`SEQUENCE_ECOSYSTEM_CONNECTOR_URL` → `http://localhost:4444`
 
 **Optional**: `TRAILS_API_KEY`, `TRAILS_TOKEN_MAP_JSON`, `POLYGON_AGENT_DEBUG_FETCH=1`, `POLYGON_AGENT_DEBUG_FEE=1`
 
@@ -130,11 +137,11 @@ Omit `--broadcast` for dry-run preview.
 
 | Issue | Fix |
 |-------|-----|
-| Session expired | Re-run `wallet create --wait` |
+| Session expired | Re-run `wallet create` |
 | Insufficient funds | Fund wallet address with POL |
 | Fee errors | Set `POLYGON_AGENT_DEBUG_FEE=1` to inspect |
 | Tx failed | Omit `--broadcast` for dry-run first |
-| Callback timeout | `--wait --timeout 600` |
+| Callback timeout | `--timeout 600` |
 
 ---
 
