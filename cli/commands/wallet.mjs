@@ -30,6 +30,12 @@ function randomId(bytes = 16) {
   return b64urlEncode(nacl.randomBytes(bytes))
 }
 
+// ERC-8004 contracts — always whitelisted in sessions
+const ERC8004_CONTRACTS = [
+  '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432', // IdentityRegistry
+  '0x8004BAa17C55a88189AE136b182e5fdA19dE9b63', // ReputationRegistry
+]
+
 // Parse session permission args and append them to a URL
 function applySessionPermissionParams(url, args) {
   // One-off ERC20 transfer (fixed recipient + amount) — must provide both or neither
@@ -43,11 +49,13 @@ function applySessionPermissionParams(url, args) {
   }
 
   // Open-ended spending limits
+  // Default usdcLimit ensures fee-payment permissions are always included (both native USDC
+  // and Bridged USDC.e), so wallets funded only with ERC20 tokens work out-of-the-box.
   const nativeLimit = getArg(args, '--native-limit') || getArg(args, '--pol-limit')
-  const usdcLimit = getArg(args, '--usdc-limit')
+  const usdcLimit = getArg(args, '--usdc-limit') || '50'
   const usdtLimit = getArg(args, '--usdt-limit')
   if (nativeLimit) url.searchParams.set('nativeLimit', nativeLimit)
-  if (usdcLimit) url.searchParams.set('usdcLimit', usdcLimit)
+  url.searchParams.set('usdcLimit', usdcLimit)
   if (usdtLimit) url.searchParams.set('usdtLimit', usdtLimit)
 
   // Generic token limits (repeatable: --token-limit USDC:50 --token-limit WETH:0.1)
@@ -56,11 +64,12 @@ function applySessionPermissionParams(url, args) {
     .filter(Boolean)
   if (tokenLimits.length) url.searchParams.set('tokenLimits', tokenLimits.join(','))
 
-  // Contract whitelist (repeatable: --contract 0x8004... --contract 0x8004...)
-  const contracts = getArgs(args, '--contract')
+  // Contract whitelist — always include ERC-8004 contracts, plus any user-specified ones
+  const userContracts = getArgs(args, '--contract')
     .map((s) => String(s || '').trim())
     .filter(Boolean)
-  if (contracts.length) url.searchParams.set('contracts', contracts.join(','))
+  const allContracts = [...new Set([...ERC8004_CONTRACTS, ...userContracts])]
+  url.searchParams.set('contracts', allContracts.join(','))
 }
 
 // Wallet create command (formerly create-request)
@@ -83,6 +92,9 @@ export async function walletCreate() {
     const createdAt = new Date().toISOString()
     const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() // 2 hours
 
+    // Add project access key if available
+    const projectAccessKey = getArg(args, '--access-key') || process.env.SEQUENCE_PROJECT_ACCESS_KEY
+
     // Save request state (store chain as string, not Network object)
     await saveWalletRequest(rid, {
       rid,
@@ -91,7 +103,8 @@ export async function walletCreate() {
       createdAt,
       expiresAt,
       publicKeyB64u: pub,
-      privateKeyB64u: priv
+      privateKeyB64u: priv,
+      projectAccessKey: projectAccessKey || null
     })
 
     // Build connector URL
@@ -102,8 +115,6 @@ export async function walletCreate() {
     url.searchParams.set('pub', pub)
     url.searchParams.set('chain', chain)  // String chain name
 
-    // Add project access key if available
-    const projectAccessKey = getArg(args, '--access-key') || process.env.SEQUENCE_PROJECT_ACCESS_KEY
     if (projectAccessKey) {
       url.searchParams.set('accessKey', projectAccessKey)
     }
@@ -208,6 +219,7 @@ async function decryptAndSaveSession(name, ciphertext, rid) {
     walletAddress,
     chainId,
     chain,
+    projectAccessKey: request.projectAccessKey || null,
     explicitSession: JSON.stringify(explicitSession, jsonReplacers),
     sessionPk: explicitSession.pk,
     implicitPk: implicit.pk,
@@ -302,6 +314,8 @@ export async function walletCreateAndWait() {
     const createdAt = new Date().toISOString()
     const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
 
+    const projectAccessKey = getArg(args, '--access-key') || process.env.SEQUENCE_PROJECT_ACCESS_KEY
+
     await saveWalletRequest(rid, {
       rid,
       walletName: name,
@@ -309,11 +323,20 @@ export async function walletCreateAndWait() {
       createdAt,
       expiresAt,
       publicKeyB64u: pub,
-      privateKeyB64u: priv
+      privateKeyB64u: priv,
+      projectAccessKey: projectAccessKey || null
     })
 
     // Start temp HTTP server on random port (localhost only)
     const { resolve: resolveCallback, reject: rejectCallback, promise: callbackPromise } = promiseWithResolvers()
+
+    const SUCCESS_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Session Approved</title>
+<style>body{font-family:-apple-system,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0a0a0f;color:#e5e5e5}
+.card{text-align:center;padding:2rem;border-radius:1rem;background:#16161f;border:1px solid #2a2a3a;max-width:360px}
+.check{width:48px;height:48px;margin:0 auto 1rem;border-radius:50%;background:rgba(34,197,94,.15);display:flex;align-items:center;justify-content:center}
+h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem;color:#888}</style></head>
+<body><div class="card"><div class="check"><svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+<h2>Session Approved</h2><p>You can close this tab and return to your CLI.</p></div></body></html>`
 
     const MAX_BODY = 65536 // 64KB
     const server = http.createServer((req, res) => {
@@ -341,8 +364,8 @@ export async function walletCreateAndWait() {
       req.on('data', chunk => {
         size += chunk.length
         if (size > MAX_BODY) {
-          res.writeHead(413, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ error: 'Payload too large' }))
+          res.writeHead(413, { 'Content-Type': 'text/plain' })
+          res.end('Payload too large')
           req.destroy()
           return
         }
@@ -350,18 +373,26 @@ export async function walletCreateAndWait() {
       })
       req.on('end', () => {
         try {
-          const data = JSON.parse(body)
+          // Parse body — supports both JSON (fetch) and URL-encoded (form POST)
+          let data
+          const ct = (req.headers['content-type'] || '').toLowerCase()
+          if (ct.includes('application/x-www-form-urlencoded')) {
+            data = Object.fromEntries(new URLSearchParams(body))
+          } else {
+            data = JSON.parse(body)
+          }
           if (!data.ciphertext || typeof data.ciphertext !== 'string') {
-            res.writeHead(400, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({ error: 'Missing ciphertext in body' }))
+            res.writeHead(400, { 'Content-Type': 'text/plain' })
+            res.end('Missing ciphertext')
             return
           }
-          res.writeHead(200, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ ok: true, message: 'Received' }))
+          // Respond with HTML success page (rendered in browser after form POST)
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+          res.end(SUCCESS_HTML)
           resolveCallback(data.ciphertext)
         } catch (err) {
-          res.writeHead(400, { 'Content-Type': 'application/json' })
-          res.end(JSON.stringify({ error: 'Invalid JSON' }))
+          res.writeHead(400, { 'Content-Type': 'text/plain' })
+          res.end('Invalid request body')
         }
       })
     })
@@ -381,7 +412,6 @@ export async function walletCreateAndWait() {
     url.searchParams.set('chain', chain)
     url.searchParams.set('callbackUrl', `http://localhost:${port}/callback`)
 
-    const projectAccessKey = getArg(args, '--access-key') || process.env.SEQUENCE_PROJECT_ACCESS_KEY
     if (projectAccessKey) {
       url.searchParams.set('accessKey', projectAccessKey)
     }

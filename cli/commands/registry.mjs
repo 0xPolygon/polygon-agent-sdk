@@ -62,6 +62,8 @@ export async function registerAgent() {
     // Choose registration method based on parameters
     if (agentURI && metadata.length > 0) {
       data = iface.encodeFunctionData('register(string,(string,bytes)[])', [agentURI, metadata])
+    } else if (metadata.length > 0) {
+      data = iface.encodeFunctionData('register(string,(string,bytes)[])', ['', metadata])
     } else if (agentURI) {
       data = iface.encodeFunctionData('register(string)', [agentURI])
     } else {

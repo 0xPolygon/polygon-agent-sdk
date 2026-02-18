@@ -62,6 +62,12 @@ polygon-agent wallet create \
 
 **After approval**: Fund `walletAddress` with POL + tokens.
 
+### Fund wallet via Trails
+```bash
+polygon-agent fund
+```
+Opens a Trails widget URL pre-filled with your wallet address. Open the URL in a browser to swap/bridge tokens into your wallet.
+
 ---
 
 ## Phase 3: Register Agent (ERC-8004)
@@ -107,6 +113,7 @@ Omit `--broadcast` for dry-run preview.
 | `wallet import` | Import encrypted session |
 | `wallet list` | List configured wallets |
 | `agent register` | Register agent onchain (ERC-8004) |
+| `fund` | Open Trails widget to fund wallet |
 | `balances` | Check token balances |
 | `send [--symbol SYM]` | Send native or ERC20 |
 | `send-native [--direct]` | Send POL/MATIC (explicit) |

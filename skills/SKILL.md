@@ -186,6 +186,26 @@ polygon-agent wallet import --ciphertext @/tmp/session.txt
 
 **Action Required**: Fund the `walletAddress` with MATIC and tokens.
 
+### Fund Wallet via Trails
+
+```bash
+polygon-agent fund
+```
+
+Opens a Trails widget URL pre-filled with your wallet address. Open the URL in a browser to swap/bridge tokens into your wallet. Defaults to USDC on Polygon.
+
+**Output**:
+```json
+{
+  "ok": true,
+  "walletName": "main",
+  "walletAddress": "0xEco...",
+  "chainId": 137,
+  "fundingUrl": "https://demo.trails.build/?mode=swap&toAddress=0xEco...&toChainId=137&toToken=0x...&apiKey=...&theme=light",
+  "message": "Open the funding URL in your browser to fund your wallet via Trails."
+}
+```
+
 ### Phase 3: Operations
 
 ```bash
@@ -307,6 +327,14 @@ polygon-agent wallet remove [--name <name>]
 - `wallet list`: Shows all configured wallets
 
 Alias: `wallet start-session` (legacy for `wallet import`)
+
+### Fund
+
+```bash
+polygon-agent fund [--wallet <name>] [--token <address>]
+```
+
+Opens a Trails widget URL to fund the wallet. Defaults to USDC on Polygon.
 
 ### Operations
 

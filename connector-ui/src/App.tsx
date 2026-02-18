@@ -197,6 +197,10 @@ function App() {
       const nativeLimit = params.get('nativeLimit') || params.get('polLimit')
       const tokenLimitsRaw = params.get('tokenLimits')
 
+      // Bridged USDC (USDC.e) on Polygon — always include alongside native USDC to avoid
+      // troubleshooting when the relayer selects a different USDC variant for fee payment.
+      const USDC_E_POLYGON = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
+
       const openTokenPermissions: any[] = []
 
       // Generic ERC20 limits via token-directory: tokenLimits=USDC:50,WETH:0.1
@@ -221,12 +225,22 @@ function App() {
       if (usdcLimit) {
         if (!USDC) throw new Error('USDC not found for this chain in token-directory')
         const valueLimit = BigInt(parseFloat(usdcLimit) * 1e6)
+        // Native USDC
         openTokenPermissions.push(
           Utils.PermissionBuilder.for(USDC as any)
             .forFunction('function transfer(address to, uint256 value)')
             .withUintNParam('value', valueLimit, 256, Permission.ParameterOperation.LESS_THAN_OR_EQUAL, true)
             .build()
         )
+        // Bridged USDC (USDC.e) on Polygon — same limit, covers relayer fee variant
+        if (chainId === 137) {
+          openTokenPermissions.push(
+            Utils.PermissionBuilder.for(USDC_E_POLYGON as any)
+              .forFunction('function transfer(address to, uint256 value)')
+              .withUintNParam('value', valueLimit, 256, Permission.ParameterOperation.LESS_THAN_OR_EQUAL, true)
+              .build()
+          )
+        }
       }
       if (usdtLimit) {
         if (!USDT) throw new Error('USDT not found for this chain in token-directory')
@@ -239,15 +253,15 @@ function App() {
         )
       }
 
-      // const paymentAddress = (feeTokens as any)?.paymentAddress
-
-      // Fee-option permissions (pre-approvals) so the session can pay fees with ERC20s if needed.
+      // Fee-option permissions (pre-approvals) so the session can pay fees with ERC20s.
       // IMPORTANT: We do NOT add a blanket permission for paymentAddress itself.
       // Instead, we scope permissions to ERC20.transfer(to=paymentAddress, value<=limit) per fee token.
+      // Note: we include these regardless of isFeeRequired — wallets funded only with ERC20 tokens
+      // always need these, and including them when not needed is harmless.
       const nativeFeePermission: any[] = []
 
       const feePermissions: any[] =
-        (feeTokens as any)?.isFeeRequired && (feeTokens as any)?.paymentAddress && Array.isArray((feeTokens as any)?.tokens)
+        (feeTokens as any)?.paymentAddress && Array.isArray((feeTokens as any)?.tokens)
           ? ((feeTokens as any).tokens as any[])
               .filter((t) => !!t?.contractAddress)
               .map((token: any) => {
@@ -370,8 +384,9 @@ function App() {
       const ciphertextB64u = b64urlEncode(sealed)
       setCiphertext(ciphertextB64u)
 
-      // Optional: auto-submit ciphertext to a one-shot callback URL.
-      // Accepts localhost HTTP (for CLI --wait webhook) or any HTTPS URL.
+      // Auto-submit ciphertext to a one-shot callback URL via hidden form POST.
+      // Form submissions are top-level navigations (like OAuth redirects), so they
+      // work from HTTPS pages to HTTP localhost — no mixed-content blocking.
       const isLocalCallback = callbackUrl && (callbackUrl.startsWith('http://localhost:') || callbackUrl.startsWith('http://127.0.0.1:'))
       const isSecureCallback = callbackUrl && callbackUrl.startsWith('https://')
       if (
@@ -380,21 +395,24 @@ function App() {
         callbackUrl.length < 2048 &&
         (isLocalCallback || isSecureCallback)
       ) {
-        try {
-          const res = await fetch(callbackUrl, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ rid, ciphertext: ciphertextB64u })
-          })
-          if (res.ok) {
-            setCallbackSent(true)
-          } else {
-            setCallbackFailed(true)
-          }
-        } catch (e) {
-          console.error('callback POST failed', e)
-          setCallbackFailed(true)
-        }
+        setCallbackSent(true)
+        const form = document.createElement('form')
+        form.method = 'POST'
+        form.action = callbackUrl
+        form.style.display = 'none'
+        const ridInput = document.createElement('input')
+        ridInput.type = 'hidden'
+        ridInput.name = 'rid'
+        ridInput.value = rid
+        form.appendChild(ridInput)
+        const ctInput = document.createElement('input')
+        ctInput.type = 'hidden'
+        ctInput.name = 'ciphertext'
+        ctInput.value = ciphertextB64u
+        form.appendChild(ctInput)
+        document.body.appendChild(form)
+        form.submit()
+        return // Browser will navigate away
       }
       try {
         const all = await fetchBalancesAllChains(addr)

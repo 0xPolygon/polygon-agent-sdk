@@ -52,6 +52,9 @@ async function main() {
     } else if (cmd === 'swap') {
       const { swap } = await import('./commands/operations.mjs')
       await swap()
+    } else if (cmd === 'fund') {
+      const { fund } = await import('./commands/operations.mjs')
+      await fund()
 
     // === AGENT SUBCOMMAND GROUP ===
     } else if (cmd === 'agent' && subCmd === 'register') {
@@ -128,6 +131,7 @@ WALLET:
     --contract <addr>                 Whitelist contract, repeatable
 
 OPERATIONS:
+  fund [--wallet <name>]              Open Trails widget to fund wallet
   balances [--wallet <name>]          Check token balances
   send --to <addr> --amount <num>     Send native token (auto-detect with --symbol for ERC20)
   send-native --to <addr> --amount    Send native token (explicit)

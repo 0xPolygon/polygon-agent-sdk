@@ -9,9 +9,11 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "start": "serve dist -s -l ${PORT:-3000}",
     "postinstall": "(cp -n .env.example .env) || echo already exists"
   },
   "dependencies": {
+    "serve": "^14.2.4",
     "@0xsequence/dapp-client": "3.0.0-beta.16",
     "@0xsequence/wallet-primitives": "3.0.0-beta.16",
     "@tailwindcss/vite": "^4.1.18",

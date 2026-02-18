@@ -16,13 +16,16 @@ export SEQUENCE_ECOSYSTEM_CONNECTOR_URL=<your-connector-url>
 # 3. Create wallet (opens browser, auto-waits for approval)
 polygon-agent wallet create
 
-# 4. Fund the wallet address, then:
+# 4. Fund the wallet via Trails
+polygon-agent fund
+
+# 5. Check balances and operate:
 export SEQUENCE_INDEXER_ACCESS_KEY=<indexer-key>
 polygon-agent balances
 polygon-agent send --to 0x... --amount 1.0 --broadcast
 polygon-agent send --symbol USDC --to 0x... --amount 10 --broadcast
 
-# 5. Register agent on-chain (ERC-8004)
+# 6. Register agent on-chain (ERC-8004)
 polygon-agent agent register --name "MyAgent" --broadcast
 ```
 
@@ -146,6 +149,14 @@ Session permission flags (for `wallet create`):
 | `--token-limit <SYM:AMT>` | Token limit by symbol (repeatable) |
 | `--usdc-to <addr> --usdc-amount <n>` | One-off USDC transfer (fixed recipient) |
 | `--contract <addr>` | Whitelist contract (repeatable) |
+
+### Fund
+
+```bash
+polygon-agent fund [--wallet <name>] [--token <address>]
+```
+
+Opens a Trails funding widget URL pre-filled with your wallet address. Open in a browser to swap/bridge tokens into your wallet. Defaults to USDC on Polygon.
 
 ### Operations
 

@@ -6,6 +6,23 @@ import { runDappClientTx } from '../../lib/dapp-client.mjs'
 import { getArg, hasFlag, resolveNetwork, formatUnits, parseUnits, getIndexerUrl, getExplorerUrl, getRpcUrl } from '../../lib/utils.mjs'
 import { resolveErc20BySymbol } from '../../lib/token-directory.mjs'
 
+// Get per-chain indexer URL
+function getChainIndexerUrl(chainId) {
+  const chainNames = {
+    137: 'polygon',
+    80002: 'amoy',
+    1: 'mainnet',
+    42161: 'arbitrum',
+    10: 'optimism',
+    8453: 'base',
+    43114: 'avalanche',
+    56: 'bsc',
+    100: 'gnosis'
+  }
+  const name = chainNames[chainId] || 'polygon'
+  return `https://${name}-indexer.sequence.app`
+}
+
 // Balances command
 export async function balances() {
   const args = process.argv.slice(2)
@@ -18,119 +35,44 @@ export async function balances() {
       throw new Error(`Wallet not found: ${walletName}`)
     }
 
-    // Get indexer key
-    const indexerKey = process.env.SEQUENCE_INDEXER_ACCESS_KEY
+    // Get indexer key — prefer session-stored key, fall back to env
+    const indexerKey = process.env.SEQUENCE_INDEXER_ACCESS_KEY || session.projectAccessKey || process.env.SEQUENCE_PROJECT_ACCESS_KEY
     if (!indexerKey) {
-      throw new Error('Missing SEQUENCE_INDEXER_ACCESS_KEY environment variable')
+      throw new Error('Missing project access key (not in wallet session or environment)')
     }
 
     // Resolve chain
     const chainArg = getArg(args, '--chain')
     const network = resolveNetwork(chainArg || session.chain || 'polygon')
-
-    // Use IndexerGateway endpoint (upstream fix 6034ce6)
-    const indexerUrl = getIndexerUrl(network.chainId)
-
-    // Fetch using raw API (gateway returns chain-nested response)
-    // Match upstream seq-eco.mjs request format: filter.accountAddresses + contractStatus
-    const response = await fetch(indexerUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Access-Key': indexerKey
-      },
-      body: JSON.stringify({
-        omitMetadata: false,
-        filter: { contractStatus: 'VERIFIED', accountAddresses: [session.walletAddress] }
-      })
-    })
-
-    if (!response.ok) {
-      throw new Error(`Indexer request failed: ${response.status} ${await response.text()}`)
-    }
-
-    const data = await response.json()
-
-    // Parse chain-specific response — handle multiple response shapes (matches seq-eco.mjs)
-    const chainId = String(network.chainId)
-    const chainEntry =
-      data?.chains?.[chainId] ||
-      data?.byChainId?.[chainId] ||
-      (Array.isArray(data?.chains) ? data.chains.find((x) => String(x?.chainId || x?.chainID) === chainId) : null) ||
-      (Array.isArray(data?.balances) ? data.balances.find(b => String(b.chainId || b.chainID) === chainId) : null) ||
-      (data?.balances || data?.nativeBalances ? data : null)
-
-    if (!chainEntry) {
-      console.log(JSON.stringify({
-        ok: true,
-        walletName,
-        walletAddress: session.walletAddress,
-        chainId: network.chainId,
-        chain: network.name,
-        balances: []
-      }, null, 2))
-      return
-    }
-
     const nativeDecimals = network.nativeCurrency?.decimals ?? 18
+    const nativeSymbol = network.nativeCurrency?.symbol || 'POL'
 
-    // Parse native balances
-    const nbForChain = Array.isArray(chainEntry.nativeBalances)
-      ? chainEntry.nativeBalances.find(x => String(x?.chainId || x?.chainID) === chainId)
-      : null
+    // Use per-chain Sequence Indexer
+    const { SequenceIndexer } = await import('@0xsequence/indexer')
+    const indexerUrl = getChainIndexerUrl(network.chainId)
+    const indexer = new SequenceIndexer(indexerUrl, indexerKey)
 
-    const nativeBalances = Array.isArray(nbForChain?.results) ? nbForChain.results : []
+    // Fetch native and token balances in parallel
+    const [nativeRes, tokenRes] = await Promise.all([
+      indexer.getNativeTokenBalance({ accountAddress: session.walletAddress }),
+      indexer.getTokenBalances({ accountAddress: session.walletAddress, includeMetadata: true })
+    ])
 
-    let native = nativeBalances.map(b => ({
+    // Parse native balance
+    const nativeWei = nativeRes?.balance?.balance || '0'
+    const native = [{
       type: 'native',
-      symbol: b.symbol || b.name || network.nativeCurrency?.symbol || 'NATIVE',
-      balance: formatUnits(b.balance || '0', nativeDecimals)
-    }))
-
-    // RPC fallback for native balance (upstream fix 722ea1b)
-    const rpcUrl = getRpcUrl(network)
-    if (native.length === 0 && rpcUrl) {
-      try {
-        const rpcRes = await fetch(rpcUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 1,
-            method: 'eth_getBalance',
-            params: [session.walletAddress, 'latest']
-          })
-        })
-
-        if (rpcRes.ok) {
-          const rpcJson = await rpcRes.json()
-          const hex = rpcJson?.result
-          if (typeof hex === 'string' && hex.startsWith('0x')) {
-            const wei = BigInt(hex)
-            native = [{
-              type: 'native',
-              symbol: network.nativeCurrency?.symbol || 'NATIVE',
-              balance: formatUnits(wei, nativeDecimals)
-            }]
-          }
-        }
-      } catch (err) {
-        // Fallback failed, continue with empty native balances
-      }
-    }
+      symbol: nativeSymbol,
+      balance: formatUnits(BigInt(nativeWei), nativeDecimals)
+    }]
 
     // Parse ERC20 balances
-    const balancesForChain = Array.isArray(chainEntry.balances)
-      ? chainEntry.balances.find(x => String(x?.chainId || x?.chainID) === chainId)
-      : null
-
-    const tokenResults = Array.isArray(balancesForChain?.results) ? balancesForChain.results : []
-
-    const erc20 = tokenResults.map(b => ({
+    const erc20 = (tokenRes?.balances || []).map(b => ({
       type: 'erc20',
       symbol: b.contractInfo?.symbol || 'ERC20',
+      name: b.contractInfo?.name || undefined,
       contractAddress: b.contractAddress,
-      balance: formatUnits(b.balance || '0', b.contractInfo?.decimals ?? 0)
+      balance: formatUnits(b.balance || '0', b.contractInfo?.decimals ?? 18)
     }))
 
     console.log(JSON.stringify({
@@ -316,6 +258,7 @@ export async function sendToken() {
 }
 
 // Swap command (Trails API)
+// Supports same-chain and cross-chain swaps via --to-chain <chain>
 export async function swap() {
   const args = process.argv.slice(2)
   const walletName = getArg(args, '--wallet') || 'main'
@@ -323,6 +266,7 @@ export async function swap() {
   const toSymbol = getArg(args, '--to')
   const amount = getArg(args, '--amount')
   const slippageArg = getArg(args, '--slippage')
+  const toChainArg = getArg(args, '--to-chain')
   const broadcast = hasFlag(args, '--broadcast')
 
   if (!fromSymbol || !toSymbol || !amount) {
@@ -333,41 +277,40 @@ export async function swap() {
     process.exit(1)
   }
 
-  if (fromSymbol.toUpperCase() === toSymbol.toUpperCase()) {
-    console.error(JSON.stringify({
-      ok: false,
-      error: 'from and to token must be different'
-    }, null, 2))
-    process.exit(1)
-  }
-
   try {
     const session = await loadWalletSession(walletName)
     if (!session) {
       throw new Error(`Wallet not found: ${walletName}`)
     }
 
+    // Origin chain: from wallet session (deposit tx signed here)
     const chainArg = getArg(args, '--chain')
-    const network = resolveNetwork(chainArg || session.chain || 'polygon')
-    const chainId = network.chainId
-    const nativeSymbol = network.nativeCurrency?.symbol || 'NATIVE'
+    const originNetwork = resolveNetwork(chainArg || session.chain || 'polygon')
+    const originChainId = originNetwork.chainId
+    const originNativeSymbol = originNetwork.nativeCurrency?.symbol || 'NATIVE'
+
+    // Destination chain: --to-chain if specified (cross-chain), else same as origin
+    const destNetwork = toChainArg ? resolveNetwork(toChainArg) : originNetwork
+    const destChainId = destNetwork.chainId
+    const destNativeSymbol = destNetwork.nativeCurrency?.symbol || 'NATIVE'
+    const isCrossChain = destChainId !== originChainId
 
     const slippage = slippageArg ? Number(slippageArg) : 0.005
     if (!Number.isFinite(slippage) || slippage <= 0 || slippage >= 0.5) {
       throw new Error('Invalid --slippage (must be between 0 and 0.5)')
     }
 
-    // Resolve tokens
-    const fromToken = await getTokenConfig({ chainId, symbol: fromSymbol, nativeSymbol })
-    const toToken = await getTokenConfig({ chainId, symbol: toSymbol, nativeSymbol })
+    // Resolve tokens: from uses origin chain, to uses destination chain
+    const fromToken = await getTokenConfig({ chainId: originChainId, symbol: fromSymbol, nativeSymbol: originNativeSymbol })
+    const toToken = await getTokenConfig({ chainId: destChainId, symbol: toSymbol, nativeSymbol: destNativeSymbol })
 
-    if (fromToken.address.toLowerCase() === toToken.address.toLowerCase()) {
+    if (!isCrossChain && fromToken.address.toLowerCase() === toToken.address.toLowerCase()) {
       throw new Error('from and to token must be different')
     }
 
     // Initialize Trails API
     const { TrailsApi, TradeType } = await import('@0xtrails/api')
-    const trailsApiKey = process.env.TRAILS_API_KEY || process.env.SEQUENCE_PROJECT_ACCESS_KEY
+    const trailsApiKey = process.env.TRAILS_API_KEY || session.projectAccessKey || process.env.SEQUENCE_PROJECT_ACCESS_KEY
     const trails = new TrailsApi(trailsApiKey, {
       hostname: process.env.TRAILS_API_HOSTNAME
     })
@@ -382,10 +325,10 @@ export async function swap() {
     // Get quote
     const quoteReq = {
       ownerAddress: walletAddress,
-      originChainId: chainId,
+      originChainId,
       originTokenAddress: fromToken.address,
       originTokenAmount,
-      destinationChainId: chainId,
+      destinationChainId: destChainId,
       destinationTokenAddress: toToken.address,
       destinationTokenAmount: '0',
       tradeType: TradeType.EXACT_INPUT,
@@ -429,7 +372,10 @@ export async function swap() {
         walletAddress,
         intentId,
         fromToken: fromToken.symbol,
+        fromChain: originNetwork.name,
         toToken: toToken.symbol,
+        toChain: destNetwork.name,
+        crossChain: isCrossChain,
         amount,
         depositTransaction: depositTx,
         note: 'Re-run with --broadcast to submit the deposit transaction and execute the intent.'
@@ -437,13 +383,13 @@ export async function swap() {
       return
     }
 
-    // Execute swap via DappClient
+    // Execute swap via DappClient (deposit tx is always on origin chain)
     const result = await runDappClientTx({
       walletName,
-      chainId,
+      chainId: originChainId,
       transactions,
       broadcast: true,
-      preferNativeFee: true
+      preferNativeFee: false  // wallet funded with USDC — prefer ERC20 fee
     })
     const txHash = result.txHash
 
@@ -456,15 +402,18 @@ export async function swap() {
     // Wait for receipt
     const receipt = await trails.waitIntentReceipt({ intentId })
 
-    const explorerUrl = getExplorerUrl(network, txHash)
+    const explorerUrl = getExplorerUrl(originNetwork, txHash)
     console.log(JSON.stringify({
       ok: true,
       walletName,
       walletAddress,
-      chain: network.name,
-      chainId,
       fromToken: fromToken.symbol,
+      fromChain: originNetwork.name,
+      fromChainId: originChainId,
       toToken: toToken.symbol,
+      toChain: destNetwork.name,
+      toChainId: destChainId,
+      crossChain: isCrossChain,
       amount,
       intentId,
       depositTxHash: txHash,
@@ -525,6 +474,45 @@ async function getTokenConfig({ chainId, symbol, nativeSymbol }) {
     symbol: sym,
     address: token.address,
     decimals: Number(token.decimals)
+  }
+}
+
+// Fund command - opens Trails funding widget with wallet address pre-filled
+export async function fund() {
+  const args = process.argv.slice(2)
+  const walletName = getArg(args, '--wallet') || 'main'
+
+  try {
+    const session = await loadWalletSession(walletName)
+    if (!session) {
+      throw new Error(`Wallet not found: ${walletName}. Run 'wallet create' first.`)
+    }
+
+    const walletAddress = session.walletAddress
+    const chainId = session.chainId || 137
+
+    // Default fund token: USDC on Polygon
+    const toToken = getArg(args, '--token') || '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359'
+    const apiKey = process.env.SEQUENCE_PROJECT_ACCESS_KEY || ''
+
+    const fundingUrl = `https://demo.trails.build/?mode=swap&toAddress=${walletAddress}&toChainId=${chainId}&toToken=${toToken}&apiKey=${apiKey}&theme=light`
+
+    console.log(JSON.stringify({
+      ok: true,
+      walletName,
+      walletAddress,
+      chainId,
+      fundingUrl,
+      message: 'Open the funding URL in your browser to fund your wallet via Trails.'
+    }, null, 2))
+
+  } catch (error) {
+    console.error(JSON.stringify({
+      ok: false,
+      error: error.message,
+      stack: error.stack
+    }, null, 2))
+    process.exit(1)
   }
 }
 
