@@ -95,6 +95,26 @@ function App() {
   const [ciphertext, setCiphertext] = useState<string>('')
   const [callbackSent, setCallbackSent] = useState<boolean>(false)
   const [callbackFailed, setCallbackFailed] = useState<boolean>(false)
+
+  const getSafeCallbackUrl = (rawUrl: string): string | null => {
+    if (!rawUrl) return null
+    try {
+      // Allow relative paths (same-origin only)
+      if (rawUrl.startsWith('/')) {
+        return rawUrl
+      }
+      const url = new URL(rawUrl)
+      // Only allow secure HTTP(S) callbacks
+      if (url.protocol !== 'https:') {
+        return null
+      }
+      // Optionally, further restrict by hostname/origin here if needed.
+      return url.toString()
+    } catch {
+      // If the URL constructor throws, treat as invalid
+      return null
+    }
+  }
   const [balances, setBalances] = useState<BalanceSummary | null>(null)
   const [feeTokens, setFeeTokens] = useState<any | null>(null)
   const [copied, setCopied] = useState(false)
@@ -389,16 +409,17 @@ function App() {
       // work from HTTPS pages to HTTP localhost — no mixed-content blocking.
       const isLocalCallback = callbackUrl && (callbackUrl.startsWith('http://localhost:') || callbackUrl.startsWith('http://127.0.0.1:'))
       const isSecureCallback = callbackUrl && callbackUrl.startsWith('https://')
+      const safeCallbackUrl = getSafeCallbackUrl(callbackUrl)
       if (
-        callbackUrl &&
-        typeof callbackUrl === 'string' &&
-        callbackUrl.length < 2048 &&
+        safeCallbackUrl &&
+        typeof safeCallbackUrl === 'string' &&
+        safeCallbackUrl.length < 2048 &&
         (isLocalCallback || isSecureCallback)
       ) {
         setCallbackSent(true)
         const form = document.createElement('form')
         form.method = 'POST'
-        form.action = callbackUrl
+        form.action = safeCallbackUrl
         form.style.display = 'none'
         const ridInput = document.createElement('input')
         ridInput.type = 'hidden'
@@ -408,6 +429,11 @@ function App() {
         const ctInput = document.createElement('input')
         ctInput.type = 'hidden'
         ctInput.name = 'ciphertext'
+
+      if (callbackUrl && !safeCallbackUrl) {
+        setCallbackFailed(true)
+        setError('Invalid or untrusted callbackUrl parameter; redirect has been blocked.')
+      }
         ctInput.value = ciphertextB64u
         form.appendChild(ctInput)
         document.body.appendChild(form)
