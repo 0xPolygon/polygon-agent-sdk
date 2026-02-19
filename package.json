@@ -1,7 +1,7 @@
 {
-  "name": "polygon-agent-kit",
+  "name": "polygon-agent-sdk",
   "version": "0.1.0",
-  "description": "Complete Polygon agent development toolkit - builder, wallet, operations, 8004 registry",
+  "description": "CLI + Agent Skills for building on-chain agents on Polygon",
   "type": "module",
   "private": true,
   "bin": {

@@ -156,4 +156,4 @@ Omit `--broadcast` for dry-run preview.
 
 All credentials: `~/.polygon-agent/` (AES-256-GCM encrypted)
 
-Repository: https://github.com/AkshatGada/test-wallet
+Repository: https://github.com/0xPolygon/polygon-agent-kit
