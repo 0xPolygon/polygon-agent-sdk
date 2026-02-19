@@ -37,7 +37,6 @@ jobs:
           VITE_PROJECT_ACCESS_KEY: ${{ secrets.VITE_PROJECT_ACCESS_KEY }}
           VITE_WALLET_URL: ${{ secrets.VITE_WALLET_URL }}
           VITE_INDEXER_ACCESS_KEY: ${{ secrets.VITE_INDEXER_ACCESS_KEY }}
-          VITE_DAPP_ORIGIN: https://agentconnect.staging.polygon.technology
 
       - name: Deploy to staging
         run: pnpm wrangler deploy --env staging
