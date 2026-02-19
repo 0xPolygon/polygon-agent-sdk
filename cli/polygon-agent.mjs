@@ -55,6 +55,9 @@ async function main() {
     } else if (cmd === 'fund') {
       const { fund } = await import('./commands/operations.mjs')
       await fund()
+    } else if (cmd === 'x402-pay') {
+      const { x402Pay } = await import('./commands/operations.mjs')
+      await x402Pay()
 
     // === AGENT SUBCOMMAND GROUP ===
     } else if (cmd === 'agent' && subCmd === 'register') {
@@ -133,6 +136,10 @@ WALLET:
 OPERATIONS:
   fund [--wallet <name>]              Open Trails widget to fund wallet
   balances [--wallet <name>]          Check token balances
+  x402-pay --url <url>                Call x402-protected resource (auto-pays 402)
+    --method <GET|POST|..>            HTTP method (default: GET)
+    --body <json>                     Request body (optional)
+    --header <Key:Value>              Additional header, repeatable
   send --to <addr> --amount <num>     Send native token (auto-detect with --symbol for ERC20)
   send-native --to <addr> --amount    Send native token (explicit)
   send-token --symbol <SYM> --to ...  Send ERC20 by symbol

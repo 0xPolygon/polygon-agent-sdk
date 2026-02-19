@@ -3,7 +3,7 @@
 
 import { loadWalletSession } from '../../lib/storage.mjs'
 import { runDappClientTx } from '../../lib/dapp-client.mjs'
-import { getArg, hasFlag, resolveNetwork, formatUnits, parseUnits, getIndexerUrl, getExplorerUrl, getRpcUrl } from '../../lib/utils.mjs'
+import { getArg, getArgs, hasFlag, resolveNetwork, formatUnits, parseUnits, getIndexerUrl, getExplorerUrl, getRpcUrl } from '../../lib/utils.mjs'
 import { resolveErc20BySymbol } from '../../lib/token-directory.mjs'
 
 // Get per-chain indexer URL
@@ -527,5 +527,94 @@ export async function send() {
     return sendToken()
   } else {
     return sendNative()
+  }
+}
+
+// x402 pay command — calls an x402-protected HTTP resource using the session key as signer
+// x402-fetch auto-handles 402 → pay → retry flow
+export async function x402Pay() {
+  const args = process.argv.slice(2)
+  const walletName = getArg(args, '--wallet') || 'main'
+  const url = getArg(args, '--url')
+  const method = (getArg(args, '--method') || 'GET').toUpperCase()
+  const body = getArg(args, '--body')
+  const headerArgs = getArgs(args, '--header') // repeatable: --header Key:Value
+
+  if (!url) {
+    console.error(JSON.stringify({ ok: false, error: 'Missing required parameter: --url' }, null, 2))
+    process.exit(1)
+  }
+
+  try {
+    const session = await loadWalletSession(walletName)
+    if (!session) throw new Error(`Wallet not found: ${walletName}`)
+
+    // explicitSession.pk is the session signing key stored when the user approved the wallet
+    const pk = session?.explicitSession?.pk
+    if (!pk) throw new Error('No session private key found in wallet. Re-link wallet via wallet create.')
+
+    // Build viem account from session key
+    const { privateKeyToAccount } = await import('viem/accounts')
+    const { wrapFetchWithPaymentFromConfig, decodePaymentResponseHeader } = await import('@x402/fetch')
+    const { ExactEvmScheme } = await import('@x402/evm')
+
+    const account = privateKeyToAccount(pk)
+
+    // wrapFetchWithPaymentFromConfig: eip155:* covers all EVM chains including Polygon
+    const fetchWithPayment = wrapFetchWithPaymentFromConfig(fetch, {
+      schemes: [{ network: 'eip155:*', client: new ExactEvmScheme(account) }]
+    })
+
+    // Parse --header Key:Value args into a headers object
+    const headers = {}
+    for (const h of headerArgs) {
+      const idx = h.indexOf(':')
+      if (idx > 0) headers[h.slice(0, idx).trim()] = h.slice(idx + 1).trim()
+    }
+
+    // Make request — x402-fetch handles 402 automatically
+    const response = await fetchWithPayment(url, {
+      method,
+      headers: Object.keys(headers).length ? headers : undefined,
+      body: body || undefined,
+    })
+
+    // Decode X-PAYMENT-RESPONSE header if present
+    const paymentResponseHeader = response.headers.get('X-PAYMENT-RESPONSE')
+    let payment = null
+    if (paymentResponseHeader) {
+      try {
+        payment = decodePaymentResponseHeader(paymentResponseHeader)
+      } catch (_) { /* ignore decode errors */ }
+    }
+
+    // Parse response body
+    const contentType = response.headers.get('content-type') || ''
+    const data = contentType.includes('application/json') ? await response.json() : await response.text()
+
+    console.log(JSON.stringify({
+      ok: response.ok,
+      status: response.status,
+      walletAddress: session.walletAddress,
+      signerAddress: account.address,
+      payment: payment ? {
+        settled: true,
+        payer: payment.from,
+        payee: payment.to,
+        amount: payment.value,
+        transaction: payment.transaction,
+      } : null,
+      data,
+    }, null, 2))
+
+    if (!response.ok) process.exit(1)
+
+  } catch (error) {
+    console.error(JSON.stringify({
+      ok: false,
+      error: error.message,
+      stack: error.stack
+    }, null, 2))
+    process.exit(1)
   }
 }
