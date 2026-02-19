@@ -20,7 +20,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: latest
+          version: 8.15.7
 
       - uses: actions/setup-node@v4
         with:
@@ -33,6 +33,11 @@ jobs:
 
       - name: Build
         run: pnpm build
+        env:
+          VITE_PROJECT_ACCESS_KEY: ${{ secrets.VITE_PROJECT_ACCESS_KEY }}
+          VITE_WALLET_URL: ${{ secrets.VITE_WALLET_URL }}
+          VITE_INDEXER_ACCESS_KEY: ${{ secrets.VITE_INDEXER_ACCESS_KEY }}
+          VITE_DAPP_ORIGIN: https://agentconnect.staging.polygon.technology
 
       - name: Deploy to staging
         run: pnpm wrangler deploy --env staging
