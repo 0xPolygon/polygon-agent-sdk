@@ -4,8 +4,8 @@
 
 import fs from 'node:fs'
 import http from 'node:http'
-import { spawn } from 'node:child_process'
 import nacl from 'tweetnacl'
+import * as ngrokSdk from '@ngrok/ngrok'
 import sealedbox from 'tweetnacl-sealedbox-js'
 import { saveWalletSession, loadWalletSession, saveWalletRequest, loadWalletRequest, listWallets } from '../../lib/storage.mjs'
 import { getArg, getArgs, hasFlag, normalizeChain, resolveNetwork } from '../../lib/utils.mjs'
@@ -295,49 +295,17 @@ export async function walletStartSession() {
   }
 }
 
-// Start an ngrok HTTP tunnel on the given port.
-// Requires ngrok to be installed and authenticated on this machine.
-// Polls the ngrok local API at 127.0.0.1:4040 until the public HTTPS URL is available.
+// Open a public HTTPS tunnel to the given local port using the @ngrok/ngrok SDK.
+// The SDK auto-downloads its own binary — no system ngrok install required.
+// Auth is read from the NGROK_AUTHTOKEN env var if present.
 async function startNgrokTunnel(port) {
-  const child = spawn('ngrok', ['http', String(port)], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env }
+  const listener = await ngrokSdk.forward({
+    addr: port,
+    authtoken_from_env: true,
   })
-
-  const logs = []
-  const onData = (buf) => {
-    const s = String(buf || '').trim()
-    if (s) logs.push(s.slice(0, 400))
-  }
-  child.stdout.on('data', onData)
-  child.stderr.on('data', onData)
-
-  const deadline = Date.now() + 15000
-  let publicUrl = null
-
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 250))
-    try {
-      const res = await fetch('http://127.0.0.1:4040/api/tunnels')
-      if (!res.ok) continue
-      const data = await res.json()
-      const tunnels = Array.isArray(data?.tunnels) ? data.tunnels : []
-      const https = tunnels.find((t) => String(t?.public_url || '').startsWith('https://'))
-      if (https?.public_url) {
-        publicUrl = https.public_url
-        break
-      }
-    } catch {
-      // API not ready yet, keep polling
-    }
-  }
-
-  if (!publicUrl) {
-    try { child.kill('SIGTERM') } catch {}
-    throw new Error(`Failed to establish ngrok tunnel within 15s (logs: ${logs.slice(-5).join(' | ')})`)
-  }
-
-  return { child, publicUrl }
+  const publicUrl = listener.url()
+  if (!publicUrl) throw new Error('ngrok tunnel returned a null URL')
+  return { listener, publicUrl }
 }
 
 // Wallet create-and-wait command: starts temp HTTP server, waits for connector UI callback
@@ -454,23 +422,21 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
     })
     const port = server.address().port
 
-    // Try to start ngrok for a public HTTPS callback URL (works for both local and remote machines).
-    // If ngrok is unavailable, fall back to localhost (user must open the URL on the same machine).
-    let ngrok = null
+    // Open a public HTTPS tunnel so the connector UI can reach the local callback server
+    // from any machine. Falls back to localhost if the tunnel cannot be established.
+    let tunnel = null
     let callbackUrl
-    let ngrokWarning = null
 
     try {
-      ngrok = await startNgrokTunnel(port)
-      callbackUrl = `${ngrok.publicUrl}${callbackPath}`
-    } catch (e) {
-      ngrokWarning = `ngrok unavailable (${e.message}); falling back to localhost. Open the URL on the same machine as the agent.`
+      tunnel = await startNgrokTunnel(port)
+      callbackUrl = `${tunnel.publicUrl}${callbackPath}`
+    } catch {
       callbackUrl = `http://localhost:${port}${callbackPath}`
     }
 
     const cleanup = () => {
       try { server.close() } catch {}
-      try { ngrok?.child?.kill('SIGTERM') } catch {}
+      try { tunnel?.listener?.close() } catch {}
     }
 
     process.once('SIGINT', () => {
@@ -494,18 +460,15 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
     // Add session permission params (spending limits, token limits, contracts)
     applySessionPermissionParams(url, args)
 
-    const output = {
+    console.log(JSON.stringify({
       ok: true,
       walletName: name,
       chain,
       rid,
       url: url.toString(),
-      callbackUrl,
       expiresAt,
       message: `Waiting for session approval (timeout ${timeoutSec}s)... Open URL in browser.`
-    }
-    if (ngrokWarning) output.warning = ngrokWarning
-    console.log(JSON.stringify(output, null, 2))
+    }, null, 2))
 
     // Wait for callback or timeout
     const timeoutPromise = new Promise((_, reject) => {
