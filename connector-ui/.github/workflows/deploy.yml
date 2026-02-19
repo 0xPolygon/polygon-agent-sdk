@@ -36,6 +36,7 @@ jobs:
         env:
           VITE_PROJECT_ACCESS_KEY: ${{ secrets.VITE_PROJECT_ACCESS_KEY }}
           VITE_WALLET_URL: ${{ secrets.VITE_WALLET_URL }}
+          VITE_DAPP_ORIGIN: ${{ secrets.VITE_DAPP_ORIGIN }}
           VITE_INDEXER_ACCESS_KEY: ${{ secrets.VITE_INDEXER_ACCESS_KEY }}
 
       - name: Deploy to staging
