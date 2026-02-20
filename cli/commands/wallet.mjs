@@ -298,12 +298,12 @@ export async function walletStartSession() {
 
 // Open a public HTTPS tunnel to the given local port using the @ngrok/ngrok SDK.
 // The SDK auto-downloads its own binary — no system ngrok install required.
-// Auth is read from the NGROK_AUTHTOKEN env var if present.
+// Auth is resolved from NGROK_AUTHTOKEN env var if set, otherwise falls back to
+// the local ngrok config (~/.ngrok2/ngrok.yml or ~/.config/ngrok/ngrok.yml).
 async function startNgrokTunnel(port) {
-  const listener = await ngrokSdk.forward({
-    addr: port,
-    authtoken_from_env: true,
-  })
+  const opts = { addr: port }
+  if (process.env.NGROK_AUTHTOKEN) opts.authtoken = process.env.NGROK_AUTHTOKEN
+  const listener = await ngrokSdk.forward(opts)
   const publicUrl = listener.url()
   if (!publicUrl) throw new Error('ngrok tunnel returned a null URL')
   return { listener, publicUrl }
