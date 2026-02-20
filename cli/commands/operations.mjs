@@ -581,8 +581,8 @@ export async function deposit() {
       )
     }
 
-    // Pick highest APY pool
-    pools.sort((a, b) => b.apy - a.apy)
+    // Pick most liquid pool (highest TVL)
+    pools.sort((a, b) => b.tvl - a.tvl)
     const pool = pools[0]
     const proto = (pool.protocol || '').toLowerCase()
 

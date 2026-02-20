@@ -253,7 +253,7 @@ polygon-agent deposit --asset USDC --amount 0.3
 polygon-agent deposit --asset USDC --amount 0.3 --protocol aave --broadcast
 ```
 
-Pool discovery uses `TrailsApi.getEarnPools` — picks the highest-APY active pool for the asset on the current chain. Supported execution protocols: **aave** (v3 `supply`), **morpho** (ERC-4626 `deposit`).
+Pool discovery uses `TrailsApi.getEarnPools` — picks the most liquid pool (highest TVL) for the asset on the current chain. Supported execution protocols: **aave** (v3 `supply`), **morpho** (ERC-4626 `deposit`).
 
 **Session note**: If the deposit call is rejected with a session permission error, re-create the wallet session whitelisting the pool's deposit address:
 ```bash
@@ -377,7 +377,7 @@ polygon-agent deposit --asset <SYM> --amount <num> [--protocol <name>] [--broadc
 - `send-native`: Send native POL/MATIC via ValueForwarder contract. Use `--direct` to bypass ValueForwarder
 - `send-token`: Send ERC20 by symbol (resolves via token-directory)
 - `swap`: DEX swap or cross-chain bridge via Trails API. Use `--to-chain` for bridging. Configurable slippage.
-- `deposit`: Supply ERC20 to the highest-APY pool via Trails `getEarnPools`. Supports aave and morpho. Shows pool name, APY, TVL in dry-run. If session rejects the call, re-create with `--contract <depositAddress>`.
+- `deposit`: Supply ERC20 to the most liquid pool (highest TVL) via Trails `getEarnPools`. Supports aave and morpho. Shows pool name, APY, TVL in dry-run. If session rejects the call, re-create with `--contract <depositAddress>`.
 
 ### Agent (ERC-8004)
 
