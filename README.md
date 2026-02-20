@@ -209,8 +209,8 @@ polygon-agent agent reviews --agent-id <id>
 
 | Variable | Default |
 |----------|---------|
-| `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | `http://localhost:4444` |
-| `SEQUENCE_DAPP_ORIGIN` | Connector UI origin URL |
+| `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | `https://agentconnect.staging.polygon.technology` |
+| `SEQUENCE_DAPP_ORIGIN` | `https://agentconnect.staging.polygon.technology` |
 | `TRAILS_API_KEY` | Falls back to project access key |
 
 ---

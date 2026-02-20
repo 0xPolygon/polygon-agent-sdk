@@ -82,7 +82,7 @@ export async function walletCreate() {
   try {
     // Normalize chain name (don't resolve to Network object yet - that happens in wallet start-session)
     const chain = normalizeChain(chainArg)
-    const connectorUrl = process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL || 'http://localhost:4444'
+    const connectorUrl = process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL || 'https://agentconnect.staging.polygon.technology'
 
     // Generate NaCl keypair for encryption
     const rid = randomId(16)
@@ -317,7 +317,7 @@ export async function walletCreateAndWait() {
 
   try {
     const chain = normalizeChain(chainArg)
-    const connectorUrl = process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL || 'http://localhost:4444'
+    const connectorUrl = process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL || 'https://agentconnect.staging.polygon.technology'
 
     // Generate NaCl keypair for encryption
     const rid = randomId(16)
