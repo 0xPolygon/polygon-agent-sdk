@@ -69,7 +69,7 @@ export SEQUENCE_PROJECT_ACCESS_KEY=<access-key-from-phase-1>
 polygon-agent wallet create
 ```
 
-`SEQUENCE_ECOSYSTEM_CONNECTOR_URL` defaults to `https://agentconnect.staging.polygon.technology` (the hosted staging connector). Override via env var to point at a local dev server or a different deployment.
+`SEQUENCE_ECOSYSTEM_CONNECTOR_URL` defaults to `https://dev-polygon-wallet.ecosystem-demo.xyz/` (the hosted staging connector). Override via env var to point at a local dev server or a different deployment.
 
 The CLI starts a temporary HTTP server on a random localhost port and outputs a URL. Open the URL in a browser, approve the session — the connector UI automatically POSTs the encrypted session back to the CLI. No copy/paste needed.
 
@@ -389,7 +389,7 @@ Legacy aliases: `register`, `agent-wallet`, `agent-metadata`, `reputation`, `giv
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | Connector UI URL for wallet creation | `https://agentconnect.staging.polygon.technology` |
+| `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | Connector UI URL for wallet creation | `https://dev-polygon-wallet.ecosystem-demo.xyz/` |
 | `SEQUENCE_BUILDER_API_URL` | Builder API endpoint | `https://api.sequence.build` |
 | `SEQUENCE_INDEXER_URL` | Indexer URL override | `https://indexer.sequence.app/rpc/IndexerGateway/...` |
 | `SEQUENCE_ECOSYSTEM_WALLET_URL` | Ecosystem wallet URL | `https://acme-wallet.ecosystem-demo.xyz` |
