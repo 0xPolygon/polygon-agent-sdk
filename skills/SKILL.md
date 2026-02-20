@@ -1,6 +1,6 @@
 ---
 name: polygon-agent-kit
-description: Complete Polygon agent development toolkit with full ERC-8004 integration. Setup (1 command), ecosystem wallet (session-based), token operations (send POL/ERC20, DEX swaps via Trails), agent registry (identity + reputation), feedback system. Chain-specific indexer with RPC fallback, encrypted storage at ~/.polygon-agent/
+description: Complete Polygon agent development toolkit with full ERC-8004 integration. Setup (1 command), ecosystem wallet (session-based), token operations (send POL/ERC20, DEX swaps/bridges via Trails, yield deposits via Trails earn pools), agent registry (identity + reputation), feedback system. Chain-specific indexer with RPC fallback, encrypted storage at ~/.polygon-agent/
 ---
 
 # Polygon Agent Kit
@@ -226,13 +226,38 @@ polygon-agent send --to 0x... --amount 1.5 --broadcast
 polygon-agent send --symbol USDC --to 0x... --amount 10 --broadcast
 ```
 
-**Swap tokens**:
+**Swap tokens (same-chain)**:
 ```bash
 # Execute DEX swap via Trails API
 polygon-agent swap --from USDC --to USDT --amount 5 --slippage 0.005 --broadcast
 
 # Dry run (preview without broadcasting)
 polygon-agent swap --from USDC --to USDT --amount 5
+```
+
+**Bridge tokens (cross-chain)**:
+```bash
+# Bridge USDC from Polygon to Arbitrum
+polygon-agent swap --from USDC --to USDC --amount 0.5 --to-chain arbitrum --broadcast
+```
+
+**Deposit to earn yield**:
+```bash
+# Deposit USDC into the best available yield pool via Trails earn pools (Aave, Morpho, etc.)
+polygon-agent deposit --asset USDC --amount 0.3 --broadcast
+
+# Dry run — shows pool name, APY, TVL, deposit address before committing
+polygon-agent deposit --asset USDC --amount 0.3
+
+# Filter by protocol
+polygon-agent deposit --asset USDC --amount 0.3 --protocol aave --broadcast
+```
+
+Pool discovery uses `TrailsApi.getEarnPools` — picks the most liquid pool (highest TVL) for the asset on the current chain. Supported execution protocols: **aave** (v3 `supply`), **morpho** (ERC-4626 `deposit`).
+
+**Session note**: If the deposit call is rejected with a session permission error, re-create the wallet session whitelisting the pool's deposit address:
+```bash
+polygon-agent wallet create --contract <depositAddress>
 ```
 
 ### Phase 4: ERC-8004 Agent Registry
@@ -343,14 +368,16 @@ polygon-agent balances [--wallet <name>] [--chain <chain>]
 polygon-agent send --to <addr> --amount <num> [--symbol <SYM>] [--broadcast]
 polygon-agent send-native --to <addr> --amount <num> [--broadcast] [--direct]
 polygon-agent send-token --symbol <SYM> --to <addr> --amount <num> [--broadcast]
-polygon-agent swap --from <SYM> --to <SYM> --amount <num> [--broadcast] [--slippage <num>]
+polygon-agent swap --from <SYM> --to <SYM> --amount <num> [--broadcast] [--slippage <num>] [--to-chain <chain>]
+polygon-agent deposit --asset <SYM> --amount <num> [--protocol <name>] [--broadcast]
 ```
 
 - `balances`: Uses IndexerGateway with RPC fallback for testnets
 - `send`: Auto-detects native vs ERC20 based on `--symbol`/`--token` flag presence
 - `send-native`: Send native POL/MATIC via ValueForwarder contract. Use `--direct` to bypass ValueForwarder
 - `send-token`: Send ERC20 by symbol (resolves via token-directory)
-- `swap`: DEX swap via Trails API with configurable slippage
+- `swap`: DEX swap or cross-chain bridge via Trails API. Use `--to-chain` for bridging. Configurable slippage.
+- `deposit`: Supply ERC20 to the most liquid pool (highest TVL) via Trails `getEarnPools`. Supports aave and morpho. Shows pool name, APY, TVL in dry-run. If session rejects the call, re-create with `--contract <depositAddress>`.
 
 ### Agent (ERC-8004)
 
