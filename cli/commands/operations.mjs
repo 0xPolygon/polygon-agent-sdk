@@ -516,6 +516,209 @@ export async function fund() {
   }
 }
 
+// Deposit command - supply ERC20 to the best available yield pool via Trails API
+// Pool discovery uses Trails getEarnPools (returns APY, TVL, deposit address, protocol).
+// Execution encodes approve + deposit as a batched meta-transaction via Sequence smart wallet.
+//
+// Supported protocols (dispatched from Trails pool metadata):
+//   aave / aave-v3  - supply(asset, amount, onBehalfOf, referralCode)
+//   morpho          - deposit(assets, receiver)
+//
+// If the wallet session doesn't whitelist the deposit contract, re-create the session with:
+//   polygon-agent wallet create --contract <depositAddress>
+//
+// Usage:
+//   polygon-agent deposit --asset USDC --amount 0.3 [--protocol aave] [--broadcast]
+export async function deposit() {
+  const args = process.argv.slice(2)
+  const walletName = getArg(args, '--wallet') || 'main'
+  const assetSymbol = (getArg(args, '--asset') || 'USDC').toUpperCase()
+  const amountArg = getArg(args, '--amount')
+  const protocolFilter = getArg(args, '--protocol')
+  const broadcast = hasFlag(args, '--broadcast')
+
+  if (!amountArg) {
+    console.error(JSON.stringify({ ok: false, error: 'Missing required parameter: --amount' }, null, 2))
+    process.exit(1)
+  }
+
+  try {
+    const session = await loadWalletSession(walletName)
+    if (!session) throw new Error(`Wallet not found: ${walletName}`)
+
+    const chainArg = getArg(args, '--chain')
+    const network = resolveNetwork(chainArg || session.chain || 'polygon')
+    const { chainId } = network
+    const walletAddress = session.walletAddress
+
+    // Resolve asset token on this chain
+    const asset = await getTokenConfig({ chainId, symbol: assetSymbol, nativeSymbol: network.nativeCurrency?.symbol || 'POL' })
+    if (asset.address === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Native token deposits are not supported; use an ERC20 like USDC')
+    }
+
+    // Discover yield pools via Trails API
+    const { TrailsApi } = await import('@0xtrails/api')
+    const trailsApiKey = process.env.TRAILS_API_KEY || session.projectAccessKey || process.env.SEQUENCE_PROJECT_ACCESS_KEY
+    const trails = new TrailsApi(trailsApiKey, { hostname: process.env.TRAILS_API_HOSTNAME })
+
+    const earnRes = await trails.getEarnPools({ chainIds: [chainId] })
+    let pools = (earnRes?.pools || []).filter(p =>
+      p.isActive &&
+      p.chainId === chainId &&
+      p.token?.symbol?.toUpperCase() === assetSymbol
+    )
+
+    if (protocolFilter) {
+      pools = pools.filter(p => p.protocol?.toLowerCase().includes(protocolFilter.toLowerCase()))
+    }
+
+    if (pools.length === 0) {
+      throw new Error(
+        `No active earn pools found for ${assetSymbol} on ${network.name}` +
+        (protocolFilter ? ` (protocol filter: ${protocolFilter})` : '') +
+        `. Try 'polygon-agent swap --from ${assetSymbol} --to <yield-token>' as an alternative.`
+      )
+    }
+
+    // Pick highest APY pool
+    pools.sort((a, b) => b.apy - a.apy)
+    const pool = pools[0]
+    const proto = (pool.protocol || '').toLowerCase()
+
+    const { encodeFunctionData, parseUnits: viemParseUnits } = await import('viem')
+    const amountUnits = viemParseUnits(amountArg, asset.decimals)
+
+    const ERC20_APPROVE_ABI = [{
+      name: 'approve', type: 'function',
+      inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
+      outputs: [{ name: '', type: 'bool' }]
+    }]
+
+    let transactions
+    let protocolLabel
+
+    if (proto.includes('aave')) {
+      // Aave v3: approve pool + supply(asset, amount, onBehalfOf, referralCode)
+      transactions = [
+        {
+          to: asset.address,
+          value: 0n,
+          data: encodeFunctionData({
+            abi: ERC20_APPROVE_ABI, functionName: 'approve',
+            args: [pool.depositAddress, amountUnits]
+          })
+        },
+        {
+          to: pool.depositAddress,
+          value: 0n,
+          data: encodeFunctionData({
+            abi: [{ name: 'supply', type: 'function', inputs: [
+              { name: 'asset', type: 'address' }, { name: 'amount', type: 'uint256' },
+              { name: 'onBehalfOf', type: 'address' }, { name: 'referralCode', type: 'uint16' }
+            ], outputs: [] }],
+            functionName: 'supply',
+            args: [asset.address, amountUnits, walletAddress, 0]
+          })
+        }
+      ]
+      protocolLabel = pool.name || 'Aave v3'
+    } else if (proto.includes('morpho')) {
+      // Morpho ERC-4626 vault: approve vault + deposit(assets, receiver)
+      transactions = [
+        {
+          to: asset.address,
+          value: 0n,
+          data: encodeFunctionData({
+            abi: ERC20_APPROVE_ABI, functionName: 'approve',
+            args: [pool.depositAddress, amountUnits]
+          })
+        },
+        {
+          to: pool.depositAddress,
+          value: 0n,
+          data: encodeFunctionData({
+            abi: [{ name: 'deposit', type: 'function', inputs: [
+              { name: 'assets', type: 'uint256' }, { name: 'receiver', type: 'address' }
+            ], outputs: [{ name: 'shares', type: 'uint256' }] }],
+            functionName: 'deposit',
+            args: [amountUnits, walletAddress]
+          })
+        }
+      ]
+      protocolLabel = pool.name || 'Morpho'
+    } else {
+      throw new Error(
+        `Protocol "${pool.protocol}" from Trails is not yet supported for direct deposit encoding. ` +
+        `Supported: aave, morpho. Open an issue or use 'polygon-agent swap' to obtain the yield-bearing token.`
+      )
+    }
+
+    const bigintReplacer = (_k, v) => (typeof v === 'bigint' ? v.toString() : v)
+
+    if (!broadcast) {
+      console.log(JSON.stringify({
+        ok: true,
+        dryRun: true,
+        walletName,
+        walletAddress,
+        protocol: pool.protocol,
+        poolName: protocolLabel,
+        poolApy: `${(pool.apy * 100).toFixed(2)}%`,
+        poolTvl: pool.tvl,
+        depositAddress: pool.depositAddress,
+        asset: assetSymbol,
+        amount: amountArg,
+        chainId,
+        chain: network.name,
+        transactions,
+        note: `Re-run with --broadcast to submit the deposit. If session rejects the call, re-create with: polygon-agent wallet create --contract ${pool.depositAddress}`
+      }, bigintReplacer, 2))
+      return
+    }
+
+    let result
+    try {
+      result = await runDappClientTx({
+        walletName,
+        chainId,
+        transactions,
+        broadcast,
+        preferNativeFee: false
+      })
+    } catch (txErr) {
+      if (txErr.message?.includes('No signer supported')) {
+        throw new Error(
+          `Session does not permit calls to ${pool.depositAddress} (${pool.protocol} pool). ` +
+          `Re-create the wallet session with: polygon-agent wallet create --contract ${pool.depositAddress}\n` +
+          `Original error: ${txErr.message}`
+        )
+      }
+      throw txErr
+    }
+
+    console.log(JSON.stringify({
+      ok: true,
+      walletName,
+      walletAddress,
+      protocol: pool.protocol,
+      poolName: protocolLabel,
+      poolApy: `${(pool.apy * 100).toFixed(2)}%`,
+      asset: assetSymbol,
+      amount: amountArg,
+      chainId,
+      chain: network.name,
+      txHash: result.txHash,
+      explorerUrl: getExplorerUrl(network, result.txHash),
+      note: `${assetSymbol} is now earning yield in ${protocolLabel}. You will receive an interest-bearing token in your wallet.`
+    }, bigintReplacer, 2))
+
+  } catch (error) {
+    console.error(JSON.stringify({ ok: false, error: error.message, stack: error.stack }, null, 2))
+    process.exit(1)
+  }
+}
+
 // Legacy command aliases
 export async function send() {
   // Detect if sending native or token

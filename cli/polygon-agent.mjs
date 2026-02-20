@@ -55,6 +55,9 @@ async function main() {
     } else if (cmd === 'fund') {
       const { fund } = await import('./commands/operations.mjs')
       await fund()
+    } else if (cmd === 'deposit') {
+      const { deposit } = await import('./commands/operations.mjs')
+      await deposit()
     } else if (cmd === 'x402-pay') {
       const { x402Pay } = await import('./commands/operations.mjs')
       await x402Pay()
@@ -144,6 +147,7 @@ OPERATIONS:
   send-native --to <addr> --amount    Send native token (explicit)
   send-token --symbol <SYM> --to ...  Send ERC20 by symbol
   swap --from <SYM> --to <SYM>        DEX swap via Trails API
+  deposit --asset <SYM> --amount <n>  Deposit ERC20 to earn yield (Trails earn pools)
 
   Defaults: --wallet main, --chain polygon
   All send/swap commands support: --broadcast (execute), --chain <name|id>
