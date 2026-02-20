@@ -132,6 +132,7 @@ export async function walletCreate() {
       expiresAt,
       message: 'Open URL in browser to approve wallet creation, then use wallet start-session with returned ciphertext'
     }, null, 2))
+    console.error(`\nApprove wallet session:\n${url.toString()}\n`)
 
   } catch (error) {
     console.error(JSON.stringify({
@@ -469,6 +470,7 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
       expiresAt,
       message: `Waiting for session approval (timeout ${timeoutSec}s)... Open URL in browser.`
     }, null, 2))
+    console.error(`\nApprove wallet session:\n${url.toString()}\n`)
 
     // Wait for callback or timeout
     const timeoutPromise = new Promise((_, reject) => {
