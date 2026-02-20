@@ -1,0 +1,54 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "5c2548982f32",
+  "strategy": "manual-commit",
+  "branch": "feature/x402-pay",
+  "checkpoints_count": 4,
+  "files_touched": [
+    ".gitignore",
+    "README.md",
+    "agents.md",
+    "cli/commands/builder.mjs",
+    "cli/commands/operations.mjs",
+    "cli/commands/registry.mjs",
+    "cli/commands/wallet.mjs",
+    "cli/polygon-agent.mjs",
+    "connector-ui/.env",
+    "connector-ui/README.md",
+    "connector-ui/index.html",
+    "connector-ui/package.json",
+    "connector-ui/public/polygon-logo.svg",
+    "connector-ui/src/App.css",
+    "connector-ui/src/App.tsx",
+    "connector-ui/src/index.css",
+    "connector-ui/vite.config.ts",
+    "contracts/IdentityRegistry.json",
+    "contracts/ReputationRegistry.json",
+    "lib/dapp-client.mjs",
+    "lib/ethauth.mjs",
+    "lib/storage.mjs",
+    "lib/token-directory.mjs",
+    "lib/utils.mjs",
+    "package.json",
+    "skills/QUICKSTART.md",
+    "skills/SKILL.md",
+    "x402-test-server/package.json",
+    "x402-test-server/server.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/5c/2548982f32/0/metadata.json",
+      "transcript": "/5c/2548982f32/0/full.jsonl",
+      "context": "/5c/2548982f32/0/context.md",
+      "content_hash": "/5c/2548982f32/0/content_hash.txt",
+      "prompt": "/5c/2548982f32/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 238,
+    "cache_creation_tokens": 493099,
+    "cache_read_tokens": 15225782,
+    "output_tokens": 1778,
+    "api_call_count": 186
+  }
+}
