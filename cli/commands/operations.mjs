@@ -226,7 +226,7 @@ export async function sendToken() {
       chainId: network.chainId,
       transactions,
       broadcast,
-      preferNativeFee: true
+      preferNativeFee: false  // ERC20 send — prefer ERC20 fee (wallet may have no native)
     })
 
     if (!broadcast) return
