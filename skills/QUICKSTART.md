@@ -22,7 +22,7 @@ Outputs `accessKey` — needed for all wallet operations. Save `privateKey` for 
 export SEQUENCE_PROJECT_ACCESS_KEY=<access-key-from-phase-1>
 ```
 
-`SEQUENCE_ECOSYSTEM_CONNECTOR_URL` defaults to `https://dev-polygon-wallet.ecosystem-demo.xyz/` (the hosted staging connector). Override via env var to point at a local dev server or a different deployment.
+`SEQUENCE_ECOSYSTEM_CONNECTOR_URL` defaults to `https://agentconnect.staging.polygon.technology/` (the hosted staging connector). Override via env var to point at a local dev server or a different deployment.
 
 ### Option A: Auto-Wait (Default — zero copy/paste)
 ```bash
@@ -134,7 +134,7 @@ Omit `--broadcast` for dry-run preview.
 `SEQUENCE_PROJECT_ACCESS_KEY` (from setup), `SEQUENCE_INDEXER_ACCESS_KEY` (for balance checks)
 
 **Defaults** (override if needed):
-`SEQUENCE_ECOSYSTEM_CONNECTOR_URL` → `https://dev-polygon-wallet.ecosystem-demo.xyz/`
+`SEQUENCE_ECOSYSTEM_CONNECTOR_URL` → `https://agentconnect.staging.polygon.technology/`
 
 **Optional**: `TRAILS_API_KEY`, `TRAILS_TOKEN_MAP_JSON`, `POLYGON_AGENT_DEBUG_FETCH=1`, `POLYGON_AGENT_DEBUG_FEE=1`
 

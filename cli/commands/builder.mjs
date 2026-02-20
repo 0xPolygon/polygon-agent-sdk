@@ -6,7 +6,7 @@
 import { ethers } from 'ethers'
 import { generateEthAuthProof } from '../../lib/ethauth.mjs'
 import { saveBuilderConfig, loadBuilderConfig } from '../../lib/storage.mjs'
-import { getArg, hasFlag } from '../../lib/utils.mjs'
+import { getArg, hasFlag, generateAgentName } from '../../lib/utils.mjs'
 
 // Get auth token from Sequence Builder API
 async function getAuthToken(proofString) {
@@ -92,12 +92,7 @@ async function getDefaultAccessKey(projectId, jwtToken) {
 // Main builder setup command
 export async function builderSetup() {
   const args = process.argv.slice(3)
-  const name = getArg(args, '--name')
-
-  if (!name) {
-    console.error(JSON.stringify({ ok: false, error: 'Missing --name parameter' }, null, 2))
-    process.exit(1)
-  }
+  const name = getArg(args, '--name') || generateAgentName()
 
   try {
     // Check if already set up
