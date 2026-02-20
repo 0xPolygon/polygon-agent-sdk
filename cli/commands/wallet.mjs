@@ -305,6 +305,11 @@ async function startNgrokTunnel(port) {
   })
 
   const logs = []
+  let spawnError = null
+
+  // Capture spawn errors (e.g. ngrok not installed) so the outer catch can handle them
+  child.on('error', (err) => { spawnError = err })
+
   const onData = (buf) => {
     const s = String(buf || '').trim()
     if (s) logs.push(s.slice(0, 400))
@@ -317,6 +322,7 @@ async function startNgrokTunnel(port) {
 
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 250))
+    if (spawnError) throw spawnError
     try {
       const res = await fetch('http://127.0.0.1:4040/api/tunnels')
       if (!res.ok) continue
