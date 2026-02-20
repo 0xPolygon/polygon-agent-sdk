@@ -8,6 +8,7 @@ placement = { mode = "smart" }
 
 [assets]
 directory = "./dist"
+binding = "ASSETS"
 
 [env.staging]
 routes = [
