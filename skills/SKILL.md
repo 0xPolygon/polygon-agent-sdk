@@ -117,6 +117,23 @@ polygon-agent agent feedback --agent-id <id> --value <score> [--tag1 <t>] [--tag
 - **`send-native --direct`** — bypasses ValueForwarder contract for direct EOA transfer
 - **Session permissions** — without `--usdc-limit` etc., session gets bare-bones defaults and may not transact
 
+## CRITICAL: Wallet Approval URL
+
+When `wallet create` outputs a URL in the `url` or `approvalUrl` field, you **MUST** send the COMPLETE, UNTRUNCATED URL to the user. The URL contains cryptographic parameters (public key, callback token) that are required for session approval. If any part is cut off, the approval will fail.
+
+- Do NOT shorten, summarize, or add `...` to the URL
+- Do NOT split the URL across multiple messages
+- Output the raw URL exactly as returned by the CLI
+
+## Callback Modes
+
+The `wallet create` command uses ngrok to open a public HTTPS tunnel so the connector UI can POST the encrypted session back automatically. This is seamless — the user approves in the browser and the CLI picks it up.
+
+If ngrok is unavailable (no free account configured), the CLI falls back to a localhost callback. In that case, the user must copy or download the encrypted blob from the browser and run:
+```
+polygon-agent wallet import --ciphertext @/path/to/session.txt
+```
+
 ## Troubleshooting
 
 | Issue | Fix |

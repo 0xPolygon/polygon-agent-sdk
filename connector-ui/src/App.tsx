@@ -473,6 +473,19 @@ function App() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const downloadCiphertext = () => {
+    if (!ciphertext) return
+    const blob = new Blob([ciphertext], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `session-${rid || 'blob'}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   const nativeRows = (balances?.nativeBalances || []).map(b => ({
     key: `native:${b.symbol}`,
     symbol: b.symbol || b.name || 'NATIVE',
@@ -686,22 +699,34 @@ function App() {
                       value={ciphertext}
                       className="cipher-textarea w-full h-32 px-3.5 py-3 rounded-xl bg-black/30 border border-border text-text-secondary font-mono text-xs leading-relaxed focus:outline-none focus:border-poly/40 focus:ring-1 focus:ring-poly/20 transition-all"
                     />
-                    <button
-                      className="btn-press w-full h-11 rounded-xl bg-surface-hover border border-border text-text-primary font-medium text-sm hover:border-border-hover transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
-                      onClick={copyCiphertext}
-                    >
-                      {copied ? (
-                        <>
-                          <Check className="w-4 h-4 text-success" />
-                          <span className="text-success">Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          Copy encrypted blob
-                        </>
-                      )}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        className="btn-press flex-1 h-11 rounded-xl bg-surface-hover border border-border text-text-primary font-medium text-sm hover:border-border-hover transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                        onClick={copyCiphertext}
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="w-4 h-4 text-success" />
+                            <span className="text-success">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-4 h-4" />
+                            Copy
+                          </>
+                        )}
+                      </button>
+                      <button
+                        className="btn-press flex-1 h-11 rounded-xl bg-surface-hover border border-border text-text-primary font-medium text-sm hover:border-border-hover transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                        onClick={downloadCiphertext}
+                      >
+                        <ArrowRight className="w-4 h-4 rotate-90" />
+                        Download .txt
+                      </button>
+                    </div>
+                    <p className="text-xs text-text-muted">
+                      Paste to your agent or run: <code className="text-text-secondary">polygon-agent wallet import --ciphertext @session.txt</code>
+                    </p>
                   </div>
                 )}
 
