@@ -23,6 +23,7 @@ This means **the builder EOA must have a Polymarket account** (terms accepted on
 - Completed `polygon-agent setup` (creates EOA + stores encrypted private key)
 - Completed `polygon-agent wallet create` (ecosystem wallet with USDC.e balance)
 - Wallet funded with USDC.e on Polygon mainnet (`polygon-agent fund`)
+- **Builder EOA must have native POL for gas** — the EOA submits raw transactions (approve, split) directly to Polygon, which requires POL. The smart wallet's gas abstraction (USDC fees) does not apply to EOA transactions. Send 0.1 POL to the EOA once before first use: `polygon-agent send-native --to <EOA> --amount 0.1 --broadcast`
 
 ## Contracts (Polygon mainnet, chain 137)
 
@@ -405,3 +406,9 @@ node cli/polygon-agent.mjs polymarket cancel <orderId>
 | `Builder EOA not found` | Run `polygon-agent setup` first |
 | `Session expired` | Run `polygon-agent wallet create` (sessions expire after 24h) |
 | `Market has no tokenIds` | Market is closed or not yet deployed on CLOB |
+| `insufficient funds for gas` | EOA has no POL — run `polygon-agent send-native --to <EOA> --amount 0.1 --broadcast` |
+| Split succeeded but SELL failed | YES tokens are in EOA — use `--skip-fund` on retry or sell manually at polymarket.com |
+
+## Why EOA Needs POL (not USDC)
+
+Unlike `x402-pay` where the EOA only **signs** an off-chain message (no gas), Polymarket requires the EOA to submit real on-chain transactions (`approve`, `splitPosition`). The Sequence relayer's USDC gas abstraction only covers smart wallet transactions — raw EOA transactions pay gas in native POL directly to the Polygon network. This is a protocol-level constraint, not a configuration issue.
