@@ -7,21 +7,6 @@ description: Quick start guide for Polygon Agent Kit. Get project access key, cr
 
 **Goal**: Zero to operational agent in 4 phases.
 
-## Installation
-
-Install the CLI globally once — then use `polygon-agent` anywhere:
-
-```bash
-npm install -g github:0xPolygon/polygon-agent-kit
-```
-
-Verify:
-```bash
-polygon-agent --help
-```
-
----
-
 ## Phase 1: Setup
 
 ```bash
@@ -45,6 +30,8 @@ polygon-agent wallet create
 ```
 Opens URL in browser → approve session → CLI auto-ingests. No copy/paste.
 
+**CRITICAL**: The CLI outputs an `approvalUrl` that the user must open in a browser. You MUST send the COMPLETE, UNTRUNCATED URL to the user. Do NOT shorten it or add `...` — the URL contains cryptographic parameters that will break if truncated.
+
 ### Option B: Manual
 ```bash
 polygon-agent wallet create --no-wait
@@ -54,7 +41,7 @@ polygon-agent wallet import --ciphertext @/tmp/session.txt
 
 ### Session Permissions
 
-Control what the session can do. Without these, the agent gets bare-bones defaults and may not be able to transact.
+Control what the session can do. Without these, the agent gets bare-bones defaults and may not be able to transact. This uses ngrok to create a secure tunnel, otherwise user can copy and paste the code to their agent.
 
 ```bash
 polygon-agent wallet create \

@@ -123,16 +123,18 @@ export async function walletCreate() {
     // Add session permission params (spending limits, token limits, contracts)
     applySessionPermissionParams(url, args)
 
+    const fullUrl = url.toString()
     console.log(JSON.stringify({
       ok: true,
       walletName: name,
-      chain,  // String chain name
+      chain,
       rid,
-      url: url.toString(),
+      url: fullUrl,
       expiresAt,
-      message: 'Open URL in browser to approve wallet creation, then use wallet start-session with returned ciphertext'
+      message: 'IMPORTANT: Output the COMPLETE url below to the user. Do NOT truncate or shorten it. The user must open this exact URL in a browser to approve the wallet session.',
+      approvalUrl: fullUrl
     }, null, 2))
-    console.error(`\nApprove wallet session:\n${url.toString()}\n`)
+    console.error(`\nApprove wallet session (copy FULL url):\n${fullUrl}\n`)
 
   } catch (error) {
     console.error(JSON.stringify({
@@ -424,15 +426,20 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
     const port = server.address().port
 
     // Open a public HTTPS tunnel so the connector UI can reach the local callback server
-    // from any machine. Falls back to localhost if the tunnel cannot be established.
+    // from any machine (required for remote agents / Telegram / etc).
     let tunnel = null
     let callbackUrl
+    let callbackMode = 'none'
 
     try {
       tunnel = await startNgrokTunnel(port)
       callbackUrl = `${tunnel.publicUrl}${callbackPath}`
-    } catch {
+      callbackMode = 'tunnel'
+      console.error(`[tunnel] Public callback: ${tunnel.publicUrl}`)
+    } catch (tunnelErr) {
       callbackUrl = `http://localhost:${port}${callbackPath}`
+      callbackMode = 'localhost'
+      console.error(`[tunnel] ngrok unavailable (${tunnelErr?.message || 'unknown error'}), using localhost callback`)
     }
 
     const cleanup = () => {
@@ -461,16 +468,19 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
     // Add session permission params (spending limits, token limits, contracts)
     applySessionPermissionParams(url, args)
 
+    const fullUrl = url.toString()
     console.log(JSON.stringify({
       ok: true,
       walletName: name,
       chain,
       rid,
-      url: url.toString(),
+      url: fullUrl,
+      callbackMode,
       expiresAt,
-      message: `Waiting for session approval (timeout ${timeoutSec}s)... Open URL in browser.`
+      message: `IMPORTANT: Output the COMPLETE url below to the user. Do NOT truncate or shorten it. The user must open this exact URL in a browser to approve the wallet session. Waiting for approval (timeout ${timeoutSec}s)...`,
+      approvalUrl: fullUrl
     }, null, 2))
-    console.error(`\nApprove wallet session:\n${url.toString()}\n`)
+    console.error(`\nApprove wallet session (copy FULL url):\n${fullUrl}\n`)
 
     // Wait for callback or timeout
     const timeoutPromise = new Promise((_, reject) => {
