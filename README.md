@@ -42,7 +42,7 @@ Polygon Agent SDK gives AI agents everything they need to operate onchain:
 
 ## Quickstart
 
-### Option A: Clawhub (Openclaw)
+### Coming soon: Option A: Clawhub (Openclaw)
 
 ```bash
 npx clawhub@latest install polygon-agents-sdk
@@ -50,7 +50,7 @@ npx clawhub@latest install polygon-agents-sdk
 
 This installs the Polygon Agent SDK as a skill your agent can use. Once installed, your agent has access to wallet management, token operations, DEX swaps, and on-chain identity — all through the `polygon-agent` CLI.
 
-### Option B: Claude
+### Coming soon: Option B: Claude
 
 Add the skill to your Claude project from the repo:
 
