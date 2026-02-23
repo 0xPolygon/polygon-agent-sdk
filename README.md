@@ -17,8 +17,8 @@
 - [Quickstart](#quickstart)
 - [Core Components](#core-components)
   - [Sequence — Wallet Infrastructure](#sequence--wallet-infrastructure)
-  - [Trails — DeFi Operations](#trails--defi-operations)
-  - [Polygon Chain — On-Chain Identity](#polygon-chain--on-chain-identity)
+  - [Trails — Swapping, Bridging, and onchain actions](#trails--defi-operations)
+  - [Onchain Identity](#polygon-chain--on-chain-identity)
 - [Plugins & Skills](#plugins--skills)
 - [CLI Reference](#cli-reference)
 - [Environment Variables](#environment-variables)
@@ -32,17 +32,17 @@
 
 Polygon Agent SDK gives AI agents everything they need to operate onchain:
 
-- **Create and manage wallets** define allowances, session limits, and contract permissions. Private keys never leave the device and have to be exposed to your agent's context
-- **Send tokens, swap, bridge or any action** pay in any token for any onchain action. Built-in swapping, bridging, deposits and more.
+- **Create and manage wallets** define allowances, session limits, and contract permissions in order to transact securely. Mitigates risk of prompt injection attacks. Private keys never leave the device and have to be exposed to your agent's context.
+- **Send tokens, swap, bridge or any action** pay in any token for any onchain action. Built-in swapping, bridging, deposits, DeFi primitives, and more.
 - **Register agent identity** and build reputation via ERC-8004
-- **Integrated infrastructure** query cross-chain balances, transaction history and or query nodes via dedicated RPCs
+- **Integrated APIs** query cross-chain balances, transaction history and or query nodes via dedicated RPCs
 - **Payments first** native gas abstraction built-in, pay end to end in stablecoins for interactions.
 
 ---
 
 ## Quickstart
 
-### Option A: Clawhub (Openclaw)
+### Coming soon: Option A: Clawhub (Openclaw)
 
 ```bash
 npx clawhub@latest install polygon-agents-sdk
@@ -50,7 +50,7 @@ npx clawhub@latest install polygon-agents-sdk
 
 This installs the Polygon Agent SDK as a skill your agent can use. Once installed, your agent has access to wallet management, token operations, DEX swaps, and on-chain identity — all through the `polygon-agent` CLI.
 
-### Option B: Claude
+### Coming soon: Option B: Claude
 
 Add the skill to your Claude project from the repo:
 
@@ -86,11 +86,11 @@ polygon-agent fund
 # 5. Start operating
 export SEQUENCE_INDEXER_ACCESS_KEY=<indexer-key>
 polygon-agent balances
-polygon-agent send --to 0x... --amount 1.0 --broadcast
-polygon-agent swap --from USDC --to USDT --amount 5 --broadcast
+polygon-agent send --to 0x... --amount 1.0 
+polygon-agent swap --from USDC --to USDT --amount 5 
 
 # 6. Register your agent on-chain
-polygon-agent agent register --name "MyAgent" --broadcast
+polygon-agent agent register --name "MyAgent"
 ```
 
 > Omit `--broadcast` on any command to preview without sending. See [`skills/QUICKSTART.md`](skills/QUICKSTART.md) for the full step-by-step walkthrough.
@@ -99,39 +99,39 @@ polygon-agent agent register --name "MyAgent" --broadcast
 
 ## Core Components
 
-The SDK is built on three infrastructure pillars, each mapped to a Polygon ecosystem service.
+The SDK is built on three pillars to enable end to end onchain payments with your agents.
 
 ### Sequence — Wallet Infrastructure
 
-[Sequence](https://sequence.xyz) powers all wallet operations, RPC access, and token indexing.
+[Sequence](https://sequence.xyz) powers all wallet operations, RPC access, and indexing.
 
 | Capability | What it does | CLI command |
 |------------|-------------|-------------|
 | **Wallets** | Session-based smart contract wallets (Account Abstraction) with scoped spending permissions | `wallet create`, `wallet list` |
-| **RPCs** | Polygon network access for transaction relay and on-chain reads | Used internally by all commands |
+| **RPCs** | Load balanced RPCs cross-chain for onchain interactions and node queries | Used internally by all commands |
 | **Indexer** | Token balance queries and transaction history across ERC-20/721/1155 | `balances` |
 
-Wallet sessions are created through a secure handshake between the CLI, the Connector UI, and the Sequence Ecosystem Wallet. Session permissions let you cap spending per token, whitelist contracts, and set time-based expiry.
+Wallet sessions are created through a secure handshake between the CLI, the Connector UI, and the Sequence Ecosystem Wallet. Session permissions let you cap spending per token, whitelist contracts, and set time-based expiry and to mitigate against prompt injection attacks.
 
-### Trails — DeFi Operations
+### Trails — Swapping, Bridging, and DeFi Actions
 
-[Trails](https://sequence.xyz/trails) handles all cross-chain and DeFi operations via an aggregation layer.
+[Trails](https://sequence.xyz/trails) handles swapping, bridging, and onchain interactions enabling you to call any smart contract function and pay with any token. Trails handles it under the hood in a single transaction for your agent.
 
 | Capability | What it does | CLI command |
 |------------|-------------|-------------|
-| **Bridging** | Move assets cross-chain into your Polygon wallet | `fund` |
-| **Swapping** | DEX-aggregated token swaps with configurable slippage | `swap` |
-| **Actions** | Composable on-chain operations (send native, send ERC-20) | `send`, `send-native`, `send-token` |
+| **Bridging** | Move assets cross-chain into your Polygon wallet and fund the initial flows to your wallet | `fund` |
+| **Swapping** | Token swaps with configurable slippage seamlessly built in | `swap` |
+| **Actions** | Composable onchain operations (deposit into a DeFi vault, stake with your favorite protocol) | `send`, `deposit`, `send-token` |
 
-### Polygon Chain — On-Chain Identity
+### Onchain Agentic Identity
 
-Native Polygon contracts for agent identity, reputation, and emerging payment standards.
+Native contracts for agent identity, reputation, and emerging payment standards.
 
 | Capability | What it does | CLI command |
 |------------|-------------|-------------|
 | **ERC-8004** | Register agents as ERC-721 NFTs with metadata and on-chain reputation | `agent register`, `agent reputation`, `agent feedback` |
-| **x402** | HTTP-native micropayment protocol for agent-to-agent payments | *Coming soon* |
-| **Native Apps** | Direct interaction with Polygon-native smart contracts | Via `--contract` whitelisting |
+| **x402** | HTTP-native micropayment protocol for agentic payments to your favorite services
+| **Native Apps** | Direct interaction with smart contracts | Via `--contract` whitelisting |
 
 **ERC-8004 contracts on Polygon:**
 - Identity Registry: `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`
@@ -141,7 +141,7 @@ Native Polygon contracts for agent identity, reputation, and emerging payment st
 
 ## Plugins & Skills
 
-The SDK ships with agent-friendly documentation designed to be consumed directly by AI coding assistants.
+The SDK ships with agent-friendly documentation designed to be consumed directly by AI agents.
 
 | Distribution | How to install |
 |-------------|----------------|
@@ -217,10 +217,8 @@ polygon-agent agent reviews --agent-id <id>
 
 ## Security
 
-- **Keys never leave the device.** All credentials are AES-256-GCM encrypted at rest in `~/.polygon-agent/`.
+- **Keys never leave the device.** Credentials are encrypted at rest in `~/.polygon-agent/`. Importantly, keys don't have to be exposed to the agent's context.
 - **Session permissions are scoped.** Per-session spending limits, contract whitelists, and 24-hour expiry.
-- **Encrypted in transit.** Session material is NaCl sealed-box encrypted between CLI and Connector UI.
-- **Localhost-only callback.** The webhook server binds to localhost and accepts a single POST.
 
 ---
 
