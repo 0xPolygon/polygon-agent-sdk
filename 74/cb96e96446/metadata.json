@@ -1,0 +1,29 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "74cb96e96446",
+  "strategy": "manual-commit",
+  "branch": "feature/polymarket",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "cli/commands/polymarket.mjs",
+    "cli/polygon-agent.mjs",
+    "lib/polymarket.mjs",
+    "skills/SKILL.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/74/cb96e96446/0/metadata.json",
+      "transcript": "/74/cb96e96446/0/full.jsonl",
+      "context": "/74/cb96e96446/0/context.md",
+      "content_hash": "/74/cb96e96446/0/content_hash.txt",
+      "prompt": "/74/cb96e96446/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 56,
+    "cache_creation_tokens": 335059,
+    "cache_read_tokens": 3814180,
+    "output_tokens": 397,
+    "api_call_count": 38
+  }
+}
