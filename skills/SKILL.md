@@ -6,8 +6,9 @@ description: Complete Polygon agent toolkit. Session-based smart contract wallet
 # Polygon Agent Kit
 
 ## Prerequisites
-- Node.js 20+, `npm install` in `polygon-agent-kit/`
-- Entry point: `node cli/polygon-agent.mjs` (or `polygon-agent` if globally linked)
+- Node.js 20+
+- Install globally: `npm install -g github:0xPolygon/polygon-agent-kit`
+- Entry point: `polygon-agent <command>`
 - Storage: `~/.polygon-agent/` (AES-256-GCM encrypted)
 
 ## Architecture

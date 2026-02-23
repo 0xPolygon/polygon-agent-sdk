@@ -7,6 +7,21 @@ description: Quick start guide for Polygon Agent Kit. Get project access key, cr
 
 **Goal**: Zero to operational agent in 4 phases.
 
+## Installation
+
+Install the CLI globally once — then use `polygon-agent` anywhere:
+
+```bash
+npm install -g github:0xPolygon/polygon-agent-kit
+```
+
+Verify:
+```bash
+polygon-agent --help
+```
+
+---
+
 ## Phase 1: Setup
 
 ```bash

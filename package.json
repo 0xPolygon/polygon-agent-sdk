@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "description": "CLI + Agent Skills for building on-chain agents on Polygon",
   "type": "module",
-  "private": true,
   "bin": {
     "polygon-agent": "./cli/polygon-agent.mjs"
   },
