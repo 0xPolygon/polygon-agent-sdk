@@ -9,6 +9,8 @@
   Give your agent wallets, tokens, swaps, and on-chain identity — in one install.
 </p>
 
+Currently in beta, use at your own risk - expect breaking changes.
+
 ---
 
 ## Table of Contents
