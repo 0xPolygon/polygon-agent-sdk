@@ -79,6 +79,7 @@ export async function polymarketBuy() {
   const walletName  = getArg(args, '--wallet') || 'main'
   const priceArg    = getArg(args, '--price')
   const broadcast   = hasFlag(args, '--broadcast')
+  const skipFund    = hasFlag(args, '--skip-fund')
 
   if (!conditionId || !outcomeArg || !amountArg) {
     console.error(JSON.stringify({
@@ -167,22 +168,29 @@ export async function polymarketBuy() {
     const publicClient = createPublicClient({ chain: polygon, transport: http() })
 
     // Step 1: Fund EOA from smart wallet (transfer USDC.e)
-    process.stderr.write(`[polymarket] Funding EOA ${account.address} with ${amountUsd} USDC.e...\n`)
-    const pad = (hex, n = 64) => String(hex).replace(/^0x/, '').padStart(n, '0')
-    const transferData = '0xa9059cbb' + pad(account.address) + pad('0x' + amountUnits.toString(16))
-    const fundResult = await runDappClientTx({
-      walletName,
-      chainId: 137,
-      transactions: [{ to: USDC_E, value: 0n, data: transferData }],
-      broadcast: true,
-      preferNativeFee: false,
-    })
-    process.stderr.write(`[polymarket] Funded: ${fundResult.txHash}\n`)
+    let fundResult = { txHash: null }
+    if (skipFund) {
+      process.stderr.write(`[polymarket] --skip-fund: using existing EOA balance, skipping smart wallet transfer\n`)
+    } else {
+      process.stderr.write(`[polymarket] Funding EOA ${account.address} with ${amountUsd} USDC.e...\n`)
+      const pad = (hex, n = 64) => String(hex).replace(/^0x/, '').padStart(n, '0')
+      const transferData = '0xa9059cbb' + pad(account.address) + pad('0x' + amountUnits.toString(16))
+      fundResult = await runDappClientTx({
+        walletName,
+        chainId: 137,
+        transactions: [{ to: USDC_E, value: 0n, data: transferData }],
+        broadcast: true,
+        preferNativeFee: false,
+      })
+      process.stderr.write(`[polymarket] Funded: ${fundResult.txHash}\n`)
+    }
 
-    // Step 2: Approve USDC.e → CTF Exchange (max approval)
-    process.stderr.write(`[polymarket] Approving USDC.e → CTF Exchange...\n`)
     const MAX_UINT256 = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
-    const approveTxHash = await approveUsdce(walletClient, publicClient, CTF_EXCHANGE, MAX_UINT256)
+
+    // Step 2: Approve USDC.e → split target (CTF Exchange for regular, Neg Risk Adapter for neg risk)
+    const usdceApproveTarget = market.negRisk ? NEG_RISK_ADAPTER : CTF_EXCHANGE
+    process.stderr.write(`[polymarket] Approving USDC.e → ${market.negRisk ? 'Neg Risk Adapter' : 'CTF Exchange'}...\n`)
+    const approveTxHash = await approveUsdce(walletClient, publicClient, usdceApproveTarget, MAX_UINT256)
     process.stderr.write(`[polymarket] Approved: ${approveTxHash}\n`)
 
     // Step 3: setApprovalForAll CTF → CTF Exchange
@@ -193,7 +201,7 @@ export async function polymarketBuy() {
     // Step 3b: Additional approvals for neg risk markets
     let negRiskApproveHash = null
     if (market.negRisk) {
-      process.stderr.write(`[polymarket] Neg risk market — approving Neg Risk Exchange + Adapter...\n`)
+      process.stderr.write(`[polymarket] Neg risk market — approving CTF → Neg Risk Exchange + Adapter...\n`)
       await approveCtfForAll(walletClient, publicClient, NEG_RISK_CTF_EXCHANGE)
       negRiskApproveHash = await approveCtfForAll(walletClient, publicClient, NEG_RISK_ADAPTER)
       process.stderr.write(`[polymarket] Neg risk approved: ${negRiskApproveHash}\n`)
@@ -201,7 +209,7 @@ export async function polymarketBuy() {
 
     // Step 4: splitPosition → mints YES + NO tokens
     process.stderr.write(`[polymarket] Splitting position (conditionId: ${conditionId}, amount: ${amountUnits})...\n`)
-    const splitTxHash = await splitPosition(walletClient, publicClient, { conditionId, amount: amountUnits })
+    const splitTxHash = await splitPosition(walletClient, publicClient, { conditionId, amount: amountUnits, negRisk: market.negRisk })
     process.stderr.write(`[polymarket] Split: ${splitTxHash}\n`)
 
     // Step 5: Derive CLOB creds from EOA private key
