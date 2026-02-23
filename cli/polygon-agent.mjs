@@ -82,6 +82,19 @@ async function main() {
       const { readAllFeedback } = await import('./commands/registry.mjs')
       await readAllFeedback()
 
+    // === POLYMARKET ===
+    } else if (cmd === 'polymarket') {
+      const { polymarketMarkets, polymarketMarket, polymarketBuy,
+              polymarketPositions, polymarketOrders, polymarketCancel } =
+        await import('./commands/polymarket.mjs')
+      if (subCmd === 'markets')        await polymarketMarkets()
+      else if (subCmd === 'market')    await polymarketMarket()
+      else if (subCmd === 'buy')       await polymarketBuy()
+      else if (subCmd === 'positions') await polymarketPositions()
+      else if (subCmd === 'orders')    await polymarketOrders()
+      else if (subCmd === 'cancel')    await polymarketCancel()
+      else showHelp()
+
     // === LEGACY ALIASES (backward compatibility) ===
     } else if (cmd === 'register') {
       const { registerAgent } = await import('./commands/registry.mjs')
@@ -151,6 +164,20 @@ OPERATIONS:
 
   Defaults: --wallet main, --chain polygon
   All send/swap commands support: --broadcast (execute), --chain <name|id>
+
+POLYMARKET:
+  polymarket markets [--search <q>]       List active markets (sorted by 24h volume)
+    [--limit <n>] [--offset <n>]
+  polymarket market <conditionId>         Get single market details
+  polymarket buy <conditionId> YES|NO     Buy an outcome (split USDC.e, sell unwanted side)
+    <amount> [--price <0-1>]              --price sets limit price (default: market FOK)
+    [--wallet <n>] [--broadcast]
+  polymarket positions [--wallet <n>]     List open positions for smart wallet
+  polymarket orders                       List open CLOB orders (builder EOA)
+  polymarket cancel <orderId>             Cancel a CLOB order
+
+  Note: buy uses smart wallet to fund builder EOA, EOA signs all on-chain + CLOB ops.
+  Optional env: POLYMARKET_CLOB_URL, POLYMARKET_GAMMA_URL, POLYMARKET_DATA_URL
 
 AGENT (ERC-8004 Registry):
   agent register --name <agent-name>  Register agent identity
