@@ -1,0 +1,56 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "9f869c12047d",
+  "strategy": "manual-commit",
+  "branch": "feature/polymarket",
+  "checkpoints_count": 0,
+  "files_touched": [
+    ".gitignore",
+    "README.md",
+    "agents.md",
+    "cli/commands/builder.mjs",
+    "cli/commands/operations.mjs",
+    "cli/commands/polymarket.mjs",
+    "cli/commands/registry.mjs",
+    "cli/commands/wallet.mjs",
+    "cli/polygon-agent.mjs",
+    "connector-ui/.env",
+    "connector-ui/README.md",
+    "connector-ui/index.html",
+    "connector-ui/package.json",
+    "connector-ui/public/polygon-logo.svg",
+    "connector-ui/src/App.css",
+    "connector-ui/src/App.tsx",
+    "connector-ui/src/index.css",
+    "connector-ui/vite.config.ts",
+    "contracts/IdentityRegistry.json",
+    "contracts/ReputationRegistry.json",
+    "lib/dapp-client.mjs",
+    "lib/ethauth.mjs",
+    "lib/polymarket.mjs",
+    "lib/storage.mjs",
+    "lib/token-directory.mjs",
+    "lib/utils.mjs",
+    "package.json",
+    "skills/QUICKSTART.md",
+    "skills/SKILL.md",
+    "x402-test-server/package.json",
+    "x402-test-server/server.mjs"
+  ],
+  "sessions": [
+    {
+      "metadata": "/9f/869c12047d/0/metadata.json",
+      "transcript": "/9f/869c12047d/0/full.jsonl",
+      "context": "/9f/869c12047d/0/context.md",
+      "content_hash": "/9f/869c12047d/0/content_hash.txt",
+      "prompt": "/9f/869c12047d/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 59,
+    "cache_creation_tokens": 34982,
+    "cache_read_tokens": 4963229,
+    "output_tokens": 612,
+    "api_call_count": 53
+  }
+}
