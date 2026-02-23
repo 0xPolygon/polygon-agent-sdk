@@ -1,6 +1,6 @@
 ---
-name: polygon-agent-kit
-description: Complete Polygon agent development toolkit with full ERC-8004 integration. Setup (1 command), ecosystem wallet (session-based), token operations (send POL/ERC20, DEX swaps/bridges via Trails, yield deposits via Trails earn pools), agent registry (identity + reputation), feedback system. Chain-specific indexer with RPC fallback, encrypted storage at ~/.polygon-agent/
+name: polygon-agent-sdk
+description: Complete Polygon agent builder with ERC-8004 integration. Setup (1 command), ecosystem wallet (session-based), token operations (send POL/ERC20, DEX swaps/bridges via Trails, yield deposits via Trails earn pools), agent registry (identity + reputation), feedback system. Chain-specific indexer with RPC fallback, encrypted storage at ~/.polygon-agent/
 ---
 
 # Polygon Agent Kit
