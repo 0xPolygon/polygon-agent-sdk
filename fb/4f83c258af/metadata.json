@@ -1,0 +1,26 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "fb4f83c258af",
+  "strategy": "manual-commit",
+  "branch": "fix/skill-md-cleanup",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "skills/SKILL.md"
+  ],
+  "sessions": [
+    {
+      "metadata": "/fb/4f83c258af/0/metadata.json",
+      "transcript": "/fb/4f83c258af/0/full.jsonl",
+      "context": "/fb/4f83c258af/0/context.md",
+      "content_hash": "/fb/4f83c258af/0/content_hash.txt",
+      "prompt": "/fb/4f83c258af/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 23,
+    "cache_creation_tokens": 344488,
+    "cache_read_tokens": 1386953,
+    "output_tokens": 71,
+    "api_call_count": 13
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.4.2",
+  "checkpoint_id": "fb4f83c258af",
+  "session_id": "4c58b72c-8439-4694-9718-a00235b307e0",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-23T11:17:50.969052Z",
+  "branch": "fix/skill-md-cleanup",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "skills/SKILL.md"
+  ],
+  "agent": "Claude Code",
+  "checkpoint_transcript_start": 6394,
+  "transcript_lines_at_start": 6394,
+  "token_usage": {
+    "input_tokens": 23,
+    "cache_creation_tokens": 344488,
+    "cache_read_tokens": 1386953,
+    "output_tokens": 71,
+    "api_call_count": 13
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-23T11:17:49.540337Z",
+    "agent_lines": 75,
+    "human_added": 1398,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1473,
+    "agent_percentage": 5.091649694501019
+  }
+}
