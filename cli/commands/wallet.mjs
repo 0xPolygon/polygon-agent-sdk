@@ -428,7 +428,7 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
     // Open a public HTTPS tunnel so the connector UI can reach the local callback server
     // from any machine (required for remote agents / Telegram / etc).
     let tunnel = null
-    let callbackUrl
+    let callbackUrl = null
     let callbackMode = 'none'
 
     try {
@@ -437,9 +437,9 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
       callbackMode = 'tunnel'
       console.error(`[tunnel] Public callback: ${tunnel.publicUrl}`)
     } catch (tunnelErr) {
-      callbackUrl = `http://localhost:${port}${callbackPath}`
-      callbackMode = 'localhost'
-      console.error(`[tunnel] ngrok unavailable (${tunnelErr?.message || 'unknown error'}), using localhost callback`)
+      callbackMode = 'manual'
+      try { server.close() } catch {}
+      console.error(`[tunnel] ngrok unavailable (${tunnelErr?.message || 'unknown error'}), falling back to manual mode`)
     }
 
     const cleanup = () => {
@@ -452,14 +452,14 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
       process.exit(130)
     })
 
-    // Build connector URL with callback
+    // Build connector URL — only include callbackUrl when we have a public tunnel
     const url = new URL(connectorUrl)
     url.pathname = url.pathname.replace(/\/$/, '') + '/link'
     url.searchParams.set('rid', rid)
     url.searchParams.set('wallet', name)
     url.searchParams.set('pub', pub)
     url.searchParams.set('chain', chain)
-    url.searchParams.set('callbackUrl', callbackUrl)
+    if (callbackUrl) url.searchParams.set('callbackUrl', callbackUrl)
 
     if (projectAccessKey) {
       url.searchParams.set('accessKey', projectAccessKey)
@@ -469,6 +469,7 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
     applySessionPermissionParams(url, args)
 
     const fullUrl = url.toString()
+    const isManual = callbackMode === 'manual'
     console.log(JSON.stringify({
       ok: true,
       walletName: name,
@@ -477,21 +478,38 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
       url: fullUrl,
       callbackMode,
       expiresAt,
-      message: `IMPORTANT: Output the COMPLETE url below to the user. Do NOT truncate or shorten it. The user must open this exact URL in a browser to approve the wallet session. Waiting for approval (timeout ${timeoutSec}s)...`,
+      message: isManual
+        ? 'IMPORTANT: Output the COMPLETE approvalUrl to the user. After they approve in the browser, the encrypted blob will be displayed. Ask them to paste it back so you can complete the import.'
+        : `IMPORTANT: Output the COMPLETE url below to the user. Do NOT truncate or shorten it. The user must open this exact URL in a browser to approve the wallet session. Waiting for approval (timeout ${timeoutSec}s)...`,
       approvalUrl: fullUrl
     }, null, 2))
     console.error(`\nApprove wallet session (copy FULL url):\n${fullUrl}\n`)
 
-    // Wait for callback or timeout
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`Timed out waiting for callback (${timeoutSec}s)`)), timeoutSec * 1000)
-    })
-
     let ciphertext
-    try {
-      ciphertext = await Promise.race([callbackPromise, timeoutPromise])
-    } finally {
-      cleanup()
+    if (isManual) {
+      // No public tunnel — connector UI will display the encrypted blob in the browser.
+      // Read it from stdin so the user (or agent) can paste it here.
+      console.error('After approving in the browser, the encrypted blob will be shown.')
+      console.error('Paste it below and press Enter (or Ctrl+C to cancel):\n')
+      process.stderr.write('> ')
+      ciphertext = await readBlobFromStdin()
+      // Save a copy to a temp file for reference
+      const tmpFile = path.join(os.tmpdir(), `polygon-session-${rid}.txt`)
+      try {
+        fs.writeFileSync(tmpFile, ciphertext, 'utf8')
+        console.error(`\n[manual] Blob saved to: ${tmpFile}`)
+        console.error(`[manual] To import later: polygon-agent wallet import --ciphertext @${tmpFile}`)
+      } catch {}
+    } else {
+      // Tunnel is up — wait for the connector UI to POST back automatically
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(`Timed out waiting for callback (${timeoutSec}s)`)), timeoutSec * 1000)
+      })
+      try {
+        ciphertext = await Promise.race([callbackPromise, timeoutPromise])
+      } finally {
+        cleanup()
+      }
     }
 
     // Decrypt and save session
@@ -521,6 +539,24 @@ function promiseWithResolvers() {
   let resolve, reject
   const promise = new Promise((res, rej) => { resolve = res; reject = rej })
   return { promise, resolve, reject }
+}
+
+// Read a single line from stdin — used when no public tunnel is available
+async function readBlobFromStdin() {
+  return new Promise((resolve, reject) => {
+    let data = ''
+    process.stdin.setEncoding('utf8')
+    process.stdin.resume()
+    process.stdin.on('data', (chunk) => {
+      data += chunk
+      if (data.includes('\n')) {
+        process.stdin.pause()
+        resolve(data.trim())
+      }
+    })
+    process.stdin.on('error', reject)
+    process.stdin.on('end', () => resolve(data.trim()))
+  })
 }
 
 // Wallet list command
