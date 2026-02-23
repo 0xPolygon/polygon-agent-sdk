@@ -53,6 +53,11 @@ node cli/polygon-agent.mjs fund
 # Phase 4: Verify
 export SEQUENCE_INDEXER_ACCESS_KEY=<indexerKey>
 node cli/polygon-agent.mjs balances
+
+# Phase 5: Register agent on-chain (ERC-8004, Polygon mainnet)
+node cli/polygon-agent.mjs agent register --name "MyAgent" --broadcast
+# → mints ERC-721 NFT, emits agentId in Registered event
+# → use agentId for reputation queries and feedback
 ```
 
 ## Commands Reference
