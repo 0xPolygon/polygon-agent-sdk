@@ -31,6 +31,7 @@ description: Complete Polygon agent toolkit. Session-based smart contract wallet
 |----------|---------|
 | `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | `https://agentconnect.staging.polygon.technology/` |
 | `SEQUENCE_DAPP_ORIGIN` | Same as connector URL origin |
+| `NGROK_AUTHTOKEN` | Auto (anonymous tunnel) — set for a named/stable tunnel |
 | `TRAILS_API_KEY` | Falls back to `SEQUENCE_PROJECT_ACCESS_KEY` |
 | `TRAILS_TOKEN_MAP_JSON` | Token-directory lookup |
 | `POLYGON_AGENT_DEBUG_FETCH` | Off — logs HTTP to `~/.polygon-agent/fetch-debug.log` |
@@ -127,11 +128,17 @@ When `wallet create` outputs a URL in the `url` or `approvalUrl` field, you **MU
 
 ## Callback Modes
 
-The `wallet create` command uses ngrok to open a public HTTPS tunnel so the connector UI can POST the encrypted session back automatically. This is seamless — the user approves in the browser and the CLI picks it up.
+The `wallet create` command automatically starts a local HTTP server and opens a **dynamic public HTTPS tunnel via ngrok** — no configuration needed. The connector UI POSTs the encrypted session back through the tunnel regardless of where the agent is running. The tunnel is torn down automatically once the session is received.
 
-If ngrok is unavailable (no free account configured), the CLI falls back to a localhost callback. In that case, the user must copy or download the encrypted blob from the browser and run:
+**Manual fallback** (if ngrok is unavailable): The CLI omits `callbackUrl` so the connector UI displays the encrypted blob in the browser. The CLI then prompts:
 ```
-polygon-agent wallet import --ciphertext @/path/to/session.txt
+After approving in the browser, the encrypted blob will be shown.
+Paste it below and press Enter:
+> <paste blob here>
+```
+The blob is also saved to `/tmp/polygon-session-<rid>.txt` for reference. To import later:
+```
+polygon-agent wallet import --ciphertext @/tmp/polygon-session-<rid>.txt
 ```
 
 ## Troubleshooting
@@ -144,6 +151,7 @@ polygon-agent wallet import --ciphertext @/path/to/session.txt
 | `Session expired` | Re-run `wallet create` (24h expiry) |
 | `Fee option errors` | Set `POLYGON_AGENT_DEBUG_FEE=1`, ensure wallet has funds |
 | `Timed out waiting for callback` | Add `--timeout 600` |
+| `callbackMode: manual` (no tunnel) | Paste blob from browser when prompted; blob saved to `/tmp/polygon-session-<rid>.txt` |
 | Deposit session rejected | Re-create wallet with `--contract <depositAddress>` |
 
 ## File Structure
