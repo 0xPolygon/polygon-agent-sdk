@@ -129,6 +129,8 @@ When `wallet create` outputs a URL in the `url` or `approvalUrl` field, you **MU
 
 The `wallet create` command automatically starts a local HTTP server and opens a **Cloudflare Quick Tunnel** (`*.trycloudflare.com`) — no account or token required. The `cloudflared` binary is auto-downloaded to `~/.polygon-agent/bin/cloudflared` on first use if not already installed. The connector UI POSTs the encrypted session back through the tunnel regardless of where the agent is running. The tunnel and server are torn down automatically once the session is received.
 
+**Timing**: The `approvalUrl` is only valid while the CLI process is running. Open it immediately and complete wallet approval within the timeout window (default 300s). Never reuse a URL from a previous run — the tunnel is torn down when the CLI exits.
+
 **Manual fallback** (if cloudflared is unavailable): The CLI omits `callbackUrl` so the connector UI displays the encrypted blob in the browser. The CLI then prompts:
 ```
 After approving in the browser, the encrypted blob will be shown.
@@ -151,6 +153,8 @@ polygon-agent wallet import --ciphertext @/tmp/polygon-session-<rid>.txt
 | `Fee option errors` | Set `POLYGON_AGENT_DEBUG_FEE=1`, ensure wallet has funds |
 | `Timed out waiting for callback` | Add `--timeout 600` |
 | `callbackMode: manual` (no tunnel) | cloudflared unavailable — paste blob from browser when prompted; blob saved to `/tmp/polygon-session-<rid>.txt` |
+| `404` on `*.trycloudflare.com` | CLI timed out and tunnel is gone — re-run `wallet create`, open the new `approvalUrl` immediately |
+| `"Auto-send failed"` in browser | Copy the ciphertext shown below that message; run `wallet import --ciphertext '<blob>'` |
 | Deposit session rejected | Re-create wallet with `--contract <depositAddress>` |
 
 ## File Structure

@@ -32,6 +32,8 @@ The CLI automatically opens a **Cloudflare Quick Tunnel** (`*.trycloudflare.com`
 
 **CRITICAL**: The CLI outputs an `approvalUrl` that the user must open in a browser. You MUST send the COMPLETE, UNTRUNCATED URL to the user. Do NOT shorten it or add `...` — the URL contains cryptographic parameters that will break if truncated.
 
+**IMPORTANT — open the URL immediately**: The approval link is only valid while the CLI process is running. The tunnel and 5-minute timeout start together. Do NOT reuse a URL from a previous run — if the CLI has already exited, the tunnel is gone and you will get a 404 from the cloudflared URL. Simply re-run `wallet create` to get a fresh URL.
+
 **If cloudflared is unavailable** (`callbackMode: manual`): The browser will display the encrypted blob instead of posting it back. The CLI will prompt you to paste it:
 ```
 After approving in the browser, the encrypted blob will be shown.
@@ -160,6 +162,8 @@ Omit `--broadcast` for dry-run preview.
 | Tx failed | Omit `--broadcast` for dry-run first |
 | Callback timeout | `--timeout 600` |
 | `callbackMode: manual` shown | cloudflared unavailable — paste blob from browser when prompted |
+| 404 on `*.trycloudflare.com` URL | CLI timed out before you approved — re-run `wallet create` and open the new URL immediately |
+| "Auto-send failed" in browser | Ciphertext is shown below the message — copy it and run `polygon-agent wallet import --ciphertext '<blob>'` |
 
 ---
 
