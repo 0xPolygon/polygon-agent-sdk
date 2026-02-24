@@ -400,7 +400,7 @@ function App() {
       setCiphertext(ciphertextB64u)
 
       // Deliver ciphertext to the callback URL.
-      // HTTPS callbacks (ngrok): use fetch so the page stays and can show fallback ciphertext on error.
+      // HTTPS callbacks (cloudflared tunnel): use fetch so the page stays and can show fallback ciphertext on error.
       // Localhost callbacks: must use form submission — fetch is blocked by mixed-content from HTTPS pages.
       const safeCallbackUrl = getSafeCallbackUrl(callbackUrl)
       const isHttpsCallback = !!callbackUrl && callbackUrl.startsWith('https://')
@@ -447,8 +447,8 @@ function App() {
       }
 
       if (callbackUrl && !safeCallbackUrl) {
+        // URL is set but couldn't be validated — show ciphertext for manual copy.
         setCallbackFailed(true)
-        setError('Invalid or untrusted callbackUrl; redirect has been blocked.')
         return
       }
 
