@@ -31,7 +31,6 @@ description: Complete Polygon agent toolkit. Session-based smart contract wallet
 |----------|---------|
 | `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | `https://agentconnect.staging.polygon.technology/` |
 | `SEQUENCE_DAPP_ORIGIN` | Same as connector URL origin |
-| `NGROK_AUTHTOKEN` | Auto (anonymous tunnel) — set for a named/stable tunnel |
 | `TRAILS_API_KEY` | Falls back to `SEQUENCE_PROJECT_ACCESS_KEY` |
 | `TRAILS_TOKEN_MAP_JSON` | Token-directory lookup |
 | `POLYGON_AGENT_DEBUG_FETCH` | Off — logs HTTP to `~/.polygon-agent/fetch-debug.log` |
@@ -128,9 +127,9 @@ When `wallet create` outputs a URL in the `url` or `approvalUrl` field, you **MU
 
 ## Callback Modes
 
-The `wallet create` command automatically starts a local HTTP server and opens a **dynamic public HTTPS tunnel via ngrok** — no configuration needed. The connector UI POSTs the encrypted session back through the tunnel regardless of where the agent is running. The tunnel is torn down automatically once the session is received.
+The `wallet create` command automatically starts a local HTTP server and opens a **Cloudflare Quick Tunnel** (`*.trycloudflare.com`) — no account or token required. The `cloudflared` binary is auto-downloaded to `~/.polygon-agent/bin/cloudflared` on first use if not already installed. The connector UI POSTs the encrypted session back through the tunnel regardless of where the agent is running. The tunnel and server are torn down automatically once the session is received.
 
-**Manual fallback** (if ngrok is unavailable): The CLI omits `callbackUrl` so the connector UI displays the encrypted blob in the browser. The CLI then prompts:
+**Manual fallback** (if cloudflared is unavailable): The CLI omits `callbackUrl` so the connector UI displays the encrypted blob in the browser. The CLI then prompts:
 ```
 After approving in the browser, the encrypted blob will be shown.
 Paste it below and press Enter:
@@ -151,7 +150,7 @@ polygon-agent wallet import --ciphertext @/tmp/polygon-session-<rid>.txt
 | `Session expired` | Re-run `wallet create` (24h expiry) |
 | `Fee option errors` | Set `POLYGON_AGENT_DEBUG_FEE=1`, ensure wallet has funds |
 | `Timed out waiting for callback` | Add `--timeout 600` |
-| `callbackMode: manual` (no tunnel) | Paste blob from browser when prompted; blob saved to `/tmp/polygon-session-<rid>.txt` |
+| `callbackMode: manual` (no tunnel) | cloudflared unavailable — paste blob from browser when prompted; blob saved to `/tmp/polygon-session-<rid>.txt` |
 | Deposit session rejected | Re-create wallet with `--contract <depositAddress>` |
 
 ## File Structure

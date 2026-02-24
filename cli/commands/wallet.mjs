@@ -4,8 +4,10 @@
 
 import fs from 'node:fs'
 import http from 'node:http'
+import os from 'node:os'
+import path from 'node:path'
+import { spawn, execFileSync } from 'node:child_process'
 import nacl from 'tweetnacl'
-import * as ngrokSdk from '@ngrok/ngrok'
 import sealedbox from 'tweetnacl-sealedbox-js'
 import { saveWalletSession, loadWalletSession, saveWalletRequest, loadWalletRequest, listWallets } from '../../lib/storage.mjs'
 import { getArg, getArgs, hasFlag, normalizeChain, resolveNetwork } from '../../lib/utils.mjs'
@@ -298,20 +300,106 @@ export async function walletStartSession() {
   }
 }
 
-// Open a public HTTPS tunnel to the given local port using the @ngrok/ngrok SDK.
-// The SDK auto-downloads its own binary — no system ngrok install required.
-// Auth is resolved from NGROK_AUTHTOKEN env var if set, otherwise falls back to
-// the local ngrok config (~/.ngrok2/ngrok.yml or ~/.config/ngrok/ngrok.yml).
-async function startNgrokTunnel(port) {
-  const opts = { addr: port }
-  if (process.env.NGROK_AUTHTOKEN) opts.authtoken = process.env.NGROK_AUTHTOKEN
-  const listener = await ngrokSdk.forward(opts)
-  const publicUrl = listener.url()
-  if (!publicUrl) throw new Error('ngrok tunnel returned a null URL')
-  return { listener, publicUrl }
+// Returns the platform-specific cloudflared binary download URL and whether it's a tar archive.
+function cloudflaredDownloadInfo() {
+  const base = 'https://github.com/cloudflare/cloudflared/releases/latest/download/'
+  const p = process.platform
+  const a = process.arch
+  if (p === 'darwin') {
+    const arch = a === 'arm64' ? 'arm64' : 'amd64'
+    return { url: `${base}cloudflared-darwin-${arch}.tgz`, tar: true }
+  }
+  if (p === 'linux') {
+    const arch = a === 'arm64' ? 'arm64' : 'amd64'
+    return { url: `${base}cloudflared-linux-${arch}`, tar: false }
+  }
+  if (p === 'win32') {
+    return { url: `${base}cloudflared-windows-amd64.exe`, tar: false }
+  }
+  throw new Error(`Unsupported platform for cloudflared auto-download: ${p}/${a}`)
 }
 
-// Wallet create-and-wait command: starts temp HTTP server, waits for connector UI callback
+// Resolves the cloudflared binary path: system PATH → local cache → auto-download.
+async function resolveCloudflared() {
+  // 1. Already in PATH
+  try { execFileSync('cloudflared', ['--version'], { stdio: 'ignore' }); return 'cloudflared' } catch {}
+
+  // 2. Previously downloaded to local cache
+  const ext = process.platform === 'win32' ? '.exe' : ''
+  const binDir = path.join(os.homedir(), '.polygon-agent', 'bin')
+  const binPath = path.join(binDir, `cloudflared${ext}`)
+  if (fs.existsSync(binPath)) return binPath
+
+  // 3. Auto-download from GitHub Releases
+  console.error('[cloudflared] Binary not found — downloading...')
+  fs.mkdirSync(binDir, { recursive: true })
+
+  const { url, tar } = cloudflaredDownloadInfo()
+  const res = await fetch(url, { redirect: 'follow' })
+  if (!res.ok) throw new Error(`Failed to download cloudflared: HTTP ${res.status} from ${url}`)
+
+  const buf = Buffer.from(await res.arrayBuffer())
+  if (tar) {
+    const tmpTar = binPath + '.tgz'
+    fs.writeFileSync(tmpTar, buf)
+    execFileSync('tar', ['-xzf', tmpTar, '-C', binDir], { stdio: 'ignore' })
+    fs.unlinkSync(tmpTar)
+    // The archive extracts to a file named 'cloudflared' in binDir
+    if (!fs.existsSync(binPath)) throw new Error('cloudflared binary not found after extracting archive')
+  } else {
+    fs.writeFileSync(binPath, buf)
+  }
+
+  fs.chmodSync(binPath, 0o755)
+  console.error(`[cloudflared] Downloaded to ${binPath}`)
+  return binPath
+}
+
+// Start a Cloudflare Quick Tunnel to the given local port.
+// No account or token required — cloudflared provisions an ephemeral *.trycloudflare.com URL.
+// Auto-downloads the cloudflared binary if not already installed.
+async function startCloudflaredTunnel(port) {
+  const bin = await resolveCloudflared()
+  return new Promise((resolve, reject) => {
+    const proc = spawn(bin, ['tunnel', '--url', `http://localhost:${port}`, '--no-autoupdate'], {
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+
+    let settled = false
+    // URL appears in both stdout and stderr depending on version
+    const urlRe = /https:\/\/[a-zA-Z0-9][-a-zA-Z0-9]*\.trycloudflare\.com/
+
+    const onData = (chunk) => {
+      if (settled) return
+      const text = String(chunk)
+      const match = text.match(urlRe)
+      if (match) {
+        settled = true
+        clearTimeout(timer)
+        resolve({ publicUrl: match[0], process: proc })
+      }
+    }
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true
+        proc.kill()
+        reject(new Error('Timed out waiting for cloudflared tunnel URL (20s)'))
+      }
+    }, 20000)
+
+    proc.stdout.on('data', onData)
+    proc.stderr.on('data', onData)
+    proc.on('error', (err) => { if (!settled) { settled = true; clearTimeout(timer); reject(err) } })
+    proc.on('exit', (code) => {
+      if (!settled) { settled = true; clearTimeout(timer); reject(new Error(`cloudflared exited with code ${code}`)) }
+    })
+  })
+}
+
+// Wallet create-and-wait command: starts a local HTTP server, opens a Cloudflare Quick Tunnel
+// so the connector UI can POST the encrypted session back, then waits for the callback.
+// Falls back to manual paste if cloudflared is unavailable.
 export async function walletCreateAndWait() {
   const args = process.argv.slice(3)
   const name = getArg(args, '--name') || 'main'
@@ -344,13 +432,12 @@ export async function walletCreateAndWait() {
       projectAccessKey: projectAccessKey || null
     })
 
-    // Always use a one-shot secret token in the callback path to prevent accidental
-    // hits on the temporarily-public ngrok URL.
+    // One-shot secret token in the callback path prevents accidental hits on the public URL
     const callbackToken = randomId(24)
     const callbackPath = `/callback/${callbackToken}`
 
-    // Start temp HTTP server on random port (localhost only)
-    const { resolve: resolveCallback, reject: rejectCallback, promise: callbackPromise } = promiseWithResolvers()
+    // Start local HTTP server on a random port (localhost only)
+    const { resolve: resolveCallback, promise: callbackPromise } = promiseWithResolvers()
 
     const SUCCESS_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Session Approved</title>
 <style>body{font-family:-apple-system,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0a0a0f;color:#e5e5e5}
@@ -360,62 +447,36 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
 <body><div class="card"><div class="check"><svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
 <h2>Session Approved</h2><p>You can close this tab and return to your CLI.</p></div></body></html>`
 
-    const MAX_BODY = 65536 // 64KB
+    const MAX_BODY = 65536 // 64 KB
     const server = http.createServer((req, res) => {
-      // CORS headers for all responses
       res.setHeader('Access-Control-Allow-Origin', '*')
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-      // Preflight
-      if (req.method === 'OPTIONS') {
-        res.writeHead(204)
-        res.end()
-        return
-      }
-
-      // Only accept POST to the expected path (exact match; token path prevents random hits)
+      if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
       if (req.method !== 'POST' || req.url !== callbackPath) {
         res.writeHead(404, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ error: 'Not found' }))
         return
       }
-
-      let body = ''
-      let size = 0
+      let body = '', size = 0
       req.on('data', chunk => {
         size += chunk.length
-        if (size > MAX_BODY) {
-          res.writeHead(413, { 'Content-Type': 'text/plain' })
-          res.end('Payload too large')
-          req.destroy()
-          return
-        }
+        if (size > MAX_BODY) { res.writeHead(413); res.end('Payload too large'); req.destroy(); return }
         body += chunk
       })
       req.on('end', () => {
         try {
-          // Parse body — supports both JSON (fetch) and URL-encoded (form POST)
-          let data
           const ct = (req.headers['content-type'] || '').toLowerCase()
-          if (ct.includes('application/x-www-form-urlencoded')) {
-            data = Object.fromEntries(new URLSearchParams(body))
-          } else {
-            data = JSON.parse(body)
-          }
+          const data = ct.includes('application/x-www-form-urlencoded')
+            ? Object.fromEntries(new URLSearchParams(body))
+            : JSON.parse(body)
           if (!data.ciphertext || typeof data.ciphertext !== 'string') {
-            res.writeHead(400, { 'Content-Type': 'text/plain' })
-            res.end('Missing ciphertext')
-            return
+            res.writeHead(400); res.end('Missing ciphertext'); return
           }
-          // Respond with HTML success page (rendered in browser after form POST)
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
           res.end(SUCCESS_HTML)
           resolveCallback(data.ciphertext)
-        } catch (err) {
-          res.writeHead(400, { 'Content-Type': 'text/plain' })
-          res.end('Invalid request body')
-        }
+        } catch { res.writeHead(400); res.end('Invalid request body') }
       })
     })
 
@@ -425,34 +486,29 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
     })
     const port = server.address().port
 
-    // Open a public HTTPS tunnel so the connector UI can reach the local callback server
-    // from any machine (required for remote agents / Telegram / etc).
+    // Open a Cloudflare Quick Tunnel — no account or token required.
+    // cloudflared is auto-downloaded to ~/.polygon-agent/bin/ if not already installed.
     let tunnel = null
     let callbackUrl = null
-    let callbackMode = 'none'
+    let callbackMode = 'manual'
 
     try {
-      tunnel = await startNgrokTunnel(port)
+      tunnel = await startCloudflaredTunnel(port)
       callbackUrl = `${tunnel.publicUrl}${callbackPath}`
       callbackMode = 'tunnel'
       console.error(`[tunnel] Public callback: ${tunnel.publicUrl}`)
     } catch (tunnelErr) {
-      callbackMode = 'manual'
       try { server.close() } catch {}
-      console.error(`[tunnel] ngrok unavailable (${tunnelErr?.message || 'unknown error'}), falling back to manual mode`)
+      console.error(`[tunnel] cloudflared unavailable (${tunnelErr?.message || 'unknown'}), falling back to manual mode`)
     }
 
     const cleanup = () => {
       try { server.close() } catch {}
-      try { tunnel?.listener?.close() } catch {}
+      try { tunnel?.process?.kill() } catch {}
     }
+    process.once('SIGINT', () => { cleanup(); process.exit(130) })
 
-    process.once('SIGINT', () => {
-      cleanup()
-      process.exit(130)
-    })
-
-    // Build connector URL — only include callbackUrl when we have a public tunnel
+    // Build connector URL — only include callbackUrl when tunnel is up
     const url = new URL(connectorUrl)
     url.pathname = url.pathname.replace(/\/$/, '') + '/link'
     url.searchParams.set('rid', rid)
@@ -460,12 +516,7 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
     url.searchParams.set('pub', pub)
     url.searchParams.set('chain', chain)
     if (callbackUrl) url.searchParams.set('callbackUrl', callbackUrl)
-
-    if (projectAccessKey) {
-      url.searchParams.set('accessKey', projectAccessKey)
-    }
-
-    // Add session permission params (spending limits, token limits, contracts)
+    if (projectAccessKey) url.searchParams.set('accessKey', projectAccessKey)
     applySessionPermissionParams(url, args)
 
     const fullUrl = url.toString()
@@ -487,13 +538,10 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
 
     let ciphertext
     if (isManual) {
-      // No public tunnel — connector UI will display the encrypted blob in the browser.
-      // Read it from stdin so the user (or agent) can paste it here.
       console.error('After approving in the browser, the encrypted blob will be shown.')
       console.error('Paste it below and press Enter (or Ctrl+C to cancel):\n')
       process.stderr.write('> ')
       ciphertext = await readBlobFromStdin()
-      // Save a copy to a temp file for reference
       const tmpFile = path.join(os.tmpdir(), `polygon-session-${rid}.txt`)
       try {
         fs.writeFileSync(tmpFile, ciphertext, 'utf8')
@@ -501,10 +549,9 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
         console.error(`[manual] To import later: polygon-agent wallet import --ciphertext @${tmpFile}`)
       } catch {}
     } else {
-      // Tunnel is up — wait for the connector UI to POST back automatically
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error(`Timed out waiting for callback (${timeoutSec}s)`)), timeoutSec * 1000)
-      })
+      )
       try {
         ciphertext = await Promise.race([callbackPromise, timeoutPromise])
       } finally {
