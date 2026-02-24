@@ -449,19 +449,29 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
 
     const MAX_BODY = 65536 // 64 KB
     const server = http.createServer((req, res) => {
-      res.setHeader('Access-Control-Allow-Origin', '*')
-      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-      if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return }
+      // Reflect the request Origin back so any dynamic tunnel URL is allowed.
+      // Falling back to '*' covers same-origin and non-browser callers.
+      const corsOrigin = req.headers.origin || '*'
+      const corsHeaders = {
+        'Access-Control-Allow-Origin': corsOrigin,
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Vary': 'Origin',
+      }
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, corsHeaders)
+        res.end()
+        return
+      }
       if (req.method !== 'POST' || req.url !== callbackPath) {
-        res.writeHead(404, { 'Content-Type': 'application/json' })
+        res.writeHead(404, { 'Content-Type': 'application/json', ...corsHeaders })
         res.end(JSON.stringify({ error: 'Not found' }))
         return
       }
       let body = '', size = 0
       req.on('data', chunk => {
         size += chunk.length
-        if (size > MAX_BODY) { res.writeHead(413); res.end('Payload too large'); req.destroy(); return }
+        if (size > MAX_BODY) { res.writeHead(413, corsHeaders); res.end('Payload too large'); req.destroy(); return }
         body += chunk
       })
       req.on('end', () => {
@@ -471,12 +481,12 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
             ? Object.fromEntries(new URLSearchParams(body))
             : JSON.parse(body)
           if (!data.ciphertext || typeof data.ciphertext !== 'string') {
-            res.writeHead(400); res.end('Missing ciphertext'); return
+            res.writeHead(400, corsHeaders); res.end('Missing ciphertext'); return
           }
-          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders })
           res.end(SUCCESS_HTML)
           resolveCallback(data.ciphertext)
-        } catch { res.writeHead(400); res.end('Invalid request body') }
+        } catch { res.writeHead(400, corsHeaders); res.end('Invalid request body') }
       })
     })
 
