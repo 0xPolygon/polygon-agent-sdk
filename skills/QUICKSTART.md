@@ -28,11 +28,11 @@ export SEQUENCE_PROJECT_ACCESS_KEY=<access-key-from-phase-1>
 ```bash
 polygon-agent wallet create
 ```
-The CLI automatically creates a **dynamic public ngrok tunnel** and passes the callback URL to the connector UI. Open the URL in a browser → approve → the CLI receives the session automatically. Works whether the agent is local or remote.
+The CLI automatically opens a **Cloudflare Quick Tunnel** (`*.trycloudflare.com`) and passes the callback URL to the connector UI. Open the URL in a browser → approve → the CLI receives the session automatically. Works whether the agent is local or remote. No account or token required — `cloudflared` is auto-downloaded to `~/.polygon-agent/bin/` on first use.
 
 **CRITICAL**: The CLI outputs an `approvalUrl` that the user must open in a browser. You MUST send the COMPLETE, UNTRUNCATED URL to the user. Do NOT shorten it or add `...` — the URL contains cryptographic parameters that will break if truncated.
 
-**If ngrok is unavailable** (`callbackMode: manual`): The browser will display the encrypted blob instead of posting it back. The CLI will prompt you to paste it:
+**If cloudflared is unavailable** (`callbackMode: manual`): The browser will display the encrypted blob instead of posting it back. The CLI will prompt you to paste it:
 ```
 After approving in the browser, the encrypted blob will be shown.
 Paste it below and press Enter:
@@ -146,7 +146,7 @@ Omit `--broadcast` for dry-run preview.
 **Defaults** (override if needed):
 `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` → `https://agentconnect.staging.polygon.technology/`
 
-**Optional**: `NGROK_AUTHTOKEN` (for a named/stable tunnel — anonymous tunnel used if unset), `TRAILS_API_KEY`, `TRAILS_TOKEN_MAP_JSON`, `POLYGON_AGENT_DEBUG_FETCH=1`, `POLYGON_AGENT_DEBUG_FEE=1`
+**Optional**: `TRAILS_API_KEY`, `TRAILS_TOKEN_MAP_JSON`, `POLYGON_AGENT_DEBUG_FETCH=1`, `POLYGON_AGENT_DEBUG_FEE=1`
 
 ---
 
@@ -159,7 +159,7 @@ Omit `--broadcast` for dry-run preview.
 | Fee errors | Set `POLYGON_AGENT_DEBUG_FEE=1` to inspect |
 | Tx failed | Omit `--broadcast` for dry-run first |
 | Callback timeout | `--timeout 600` |
-| `callbackMode: manual` shown | No tunnel available — paste blob from browser when prompted |
+| `callbackMode: manual` shown | cloudflared unavailable — paste blob from browser when prompted |
 
 ---
 
