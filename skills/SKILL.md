@@ -49,7 +49,9 @@ node cli/polygon-agent.mjs wallet create --usdc-limit 100 --native-limit 5
 
 # Phase 3: Fund wallet
 node cli/polygon-agent.mjs fund
-# → opens Trails widget URL, fund via swap/bridge
+# → reads walletAddress from session, builds Trails widget URL with toAddress=<walletAddress>
+# → ALWAYS run this command to get the URL — never construct it manually or hardcode any address
+# → send the returned `fundingUrl` to the user; `walletAddress` in the output confirms the recipient
 
 # Phase 4: Verify
 export SEQUENCE_INDEXER_ACCESS_KEY=<indexerKey>
@@ -112,6 +114,7 @@ polygon-agent agent feedback --agent-id <id> --value <score> [--tag1 <t>] [--tag
 - **Dry-run by default** — all write commands require `--broadcast` to execute
 - **Smart defaults** — `--wallet main`, `--chain polygon`, auto-wait on `wallet create`
 - **Fee preference** — auto-selects USDC over native POL when both available
+- **`fund`** — reads `walletAddress` from the wallet session and sets it as `toAddress` in the Trails widget URL. Always run `polygon-agent fund` to get the correct URL — never construct it manually or hardcode any address. The returned JSON contains `fundingUrl` and `walletAddress` so you can confirm the pre-filled recipient before sharing.
 - **`deposit`** — picks highest-TVL pool via Trails `getEarnPools`. If session rejects, re-create wallet with `--contract <depositAddress>`
 - **`x402-pay`** — probes endpoint for 402, smart wallet funds builder EOA with exact token amount, EOA signs EIP-3009 payment. Chain auto-detected from 402 response
 - **`send-native --direct`** — bypasses ValueForwarder contract for direct EOA transfer
@@ -156,6 +159,7 @@ polygon-agent wallet import --ciphertext @/tmp/polygon-session-<rid>.txt
 | `404` on `*.trycloudflare.com` | CLI timed out and tunnel is gone — re-run `wallet create`, open the new `approvalUrl` immediately |
 | `"Auto-send failed"` in browser | Copy the ciphertext shown below that message; run `wallet import --ciphertext '<blob>'` |
 | Deposit session rejected | Re-create wallet with `--contract <depositAddress>` |
+| Wrong recipient in Trails widget | Run `polygon-agent fund` (do not construct the URL manually); `walletAddress` in the output confirms the pre-filled `toAddress` |
 
 ## File Structure
 ```
