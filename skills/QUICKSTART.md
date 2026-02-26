@@ -94,8 +94,8 @@ Mints ERC-721 NFT with `agentId`. Check transaction for Registered event.
 ## Phase 4: Token Operations
 
 ```bash
-# Balances
-export SEQUENCE_INDEXER_ACCESS_KEY=<indexer-key>
+# Balances (SEQUENCE_INDEXER_ACCESS_KEY is the same key from Phase 1)
+export SEQUENCE_INDEXER_ACCESS_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
 polygon-agent balances
 
 # Send POL (via ValueForwarder)
@@ -142,13 +142,20 @@ Omit `--broadcast` for dry-run preview.
 
 ## Environment Variables
 
-**Required**:
-`SEQUENCE_PROJECT_ACCESS_KEY` (from setup), `SEQUENCE_INDEXER_ACCESS_KEY` (for balance checks)
+**One key covers everything**:
+```bash
+export SEQUENCE_PROJECT_ACCESS_KEY=<access-key-from-setup>
+```
+`SEQUENCE_INDEXER_ACCESS_KEY` and `TRAILS_API_KEY` are the same value — set them all to your project access key:
+```bash
+export SEQUENCE_INDEXER_ACCESS_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
+export TRAILS_API_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
+```
 
 **Defaults** (override if needed):
 `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` → `https://agentconnect.polygon.technology/`
 
-**Optional**: `TRAILS_API_KEY`, `TRAILS_TOKEN_MAP_JSON`, `POLYGON_AGENT_DEBUG_FETCH=1`, `POLYGON_AGENT_DEBUG_FEE=1`
+**Optional**: `TRAILS_TOKEN_MAP_JSON`, `POLYGON_AGENT_DEBUG_FETCH=1`, `POLYGON_AGENT_DEBUG_FEE=1`
 
 ---
 

@@ -23,15 +23,20 @@ description: Complete Polygon agent toolkit. Session-based smart contract wallet
 ### Required
 | Variable | When |
 |----------|------|
-| `SEQUENCE_PROJECT_ACCESS_KEY` | Wallet creation, swaps |
-| `SEQUENCE_INDEXER_ACCESS_KEY` | Balance checks |
+| `SEQUENCE_PROJECT_ACCESS_KEY` | Wallet creation, swaps, balance checks, Trails |
+
+**One key, three names** — `SEQUENCE_INDEXER_ACCESS_KEY` and `TRAILS_API_KEY` are the same value as `SEQUENCE_PROJECT_ACCESS_KEY`. Set them all once:
+```bash
+export SEQUENCE_PROJECT_ACCESS_KEY=<access-key-from-setup>
+export SEQUENCE_INDEXER_ACCESS_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
+export TRAILS_API_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
+```
 
 ### Optional
 | Variable | Default |
 |----------|---------|
 | `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | `https://agentconnect.polygon.technology/` |
 | `SEQUENCE_DAPP_ORIGIN` | Same as connector URL origin |
-| `TRAILS_API_KEY` | Falls back to `SEQUENCE_PROJECT_ACCESS_KEY` |
 | `TRAILS_TOKEN_MAP_JSON` | Token-directory lookup |
 | `POLYGON_AGENT_DEBUG_FETCH` | Off — logs HTTP to `~/.polygon-agent/fetch-debug.log` |
 | `POLYGON_AGENT_DEBUG_FEE` | Off — dumps fee options to stderr |
@@ -53,8 +58,8 @@ node cli/polygon-agent.mjs fund
 # → ALWAYS run this command to get the URL — never construct it manually or hardcode any address
 # → send the returned `fundingUrl` to the user; `walletAddress` in the output confirms the recipient
 
-# Phase 4: Verify
-export SEQUENCE_INDEXER_ACCESS_KEY=<indexerKey>
+# Phase 4: Verify (SEQUENCE_INDEXER_ACCESS_KEY is the same as your project access key)
+export SEQUENCE_INDEXER_ACCESS_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
 node cli/polygon-agent.mjs balances
 
 # Phase 5: Register agent on-chain (ERC-8004, Polygon mainnet)
