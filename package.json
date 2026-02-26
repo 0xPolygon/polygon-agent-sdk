@@ -1,5 +1,5 @@
 {
-  "name": "polygon-agent-sdk",
+  "name": "polygon-agent-cli",
   "version": "0.1.2",
   "description": "CLI + Agent Skills for building on-chain agents on Polygon",
   "type": "module",
