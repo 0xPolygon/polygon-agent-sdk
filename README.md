@@ -1,7 +1,7 @@
-# Polygon Agent SDK
+# Polygon Agent CLI
 
 <p align="center">
-  <img src="assets/architecture.png" alt="Polygon Agents SDK Architecture" width="700" />
+  <img src="assets/architecture.png" alt="Polygon Agent CLI Architecture" width="700" />
 </p>
 
 <p align="center">
@@ -32,7 +32,7 @@ Currently in beta, use at your own risk - expect breaking changes.
 
 ## Overview
 
-Polygon Agent SDK gives AI agents everything they need to operate onchain:
+Polygon Agent CLI gives AI agents everything they need to operate onchain:
 
 - **Create and manage wallets** define allowances, session limits, and contract permissions in order to transact securely. Mitigates risk of prompt injection attacks. Private keys never leave the device and have to be exposed to your agent's context.
 - **Send tokens, swap, bridge or any action** pay in any token for any onchain action. Built-in swapping, bridging, deposits, DeFi primitives, and more.
@@ -47,10 +47,10 @@ Polygon Agent SDK gives AI agents everything they need to operate onchain:
 ### Coming soon: Option A: Clawhub (Openclaw)
 
 ```bash
-npx clawhub@latest install polygon-agents-sdk
+npx clawhub@latest install polygon-agent-cli
 ```
 
-This installs the Polygon Agent SDK as a skill your agent can use. Once installed, your agent has access to wallet management, token operations, DEX swaps, and on-chain identity — all through the `polygon-agent` CLI.
+This installs the Polygon Agent CLI as a skill your agent can use. Once installed, your agent has access to wallet management, token operations, DEX swaps, and on-chain identity — all through the `polygon-agent` CLI.
 
 ### Coming soon: Option B: Claude
 
@@ -85,8 +85,8 @@ polygon-agent wallet create
 # 4. Fund the wallet
 polygon-agent fund
 
-# 5. Start operating
-export SEQUENCE_INDEXER_ACCESS_KEY=<indexer-key>
+# 5. Start operating (SEQUENCE_INDEXER_ACCESS_KEY is the same as your project access key)
+export SEQUENCE_INDEXER_ACCESS_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
 polygon-agent balances
 polygon-agent send --to 0x... --amount 1.0 
 polygon-agent swap --from USDC --to USDT --amount 5 
@@ -101,7 +101,7 @@ polygon-agent agent register --name "MyAgent"
 
 ## Core Components
 
-The SDK is built on three pillars to enable end to end onchain payments with your agents.
+The CLI is built on three pillars to enable end to end onchain payments with your agents.
 
 ### Sequence — Wallet Infrastructure
 
@@ -143,11 +143,11 @@ Native contracts for agent identity, reputation, and emerging payment standards.
 
 ## Plugins & Skills
 
-The SDK ships with agent-friendly documentation designed to be consumed directly by AI agents.
+The CLI ships with agent-friendly documentation designed to be consumed directly by AI agents.
 
 | Distribution | How to install |
 |-------------|----------------|
-| **Openclaw** | `npx clawhub@latest install polygon-agents-sdk` |
+| **Openclaw** | `npx clawhub@latest install polygon-agent-cli` |
 | **Claude** | `claude skill add --url https://github.com/0xPolygon/polygon-agent-kit` |
 
 Once installed, the agent receives the full skill context — including wallet setup, token operations, and ERC-8004 registration — and can execute autonomously.
@@ -200,12 +200,13 @@ polygon-agent agent reviews --agent-id <id>
 
 ## Environment Variables
 
-**Required:**
+**One key covers everything** — `SEQUENCE_INDEXER_ACCESS_KEY` and `TRAILS_API_KEY` are the same value as `SEQUENCE_PROJECT_ACCESS_KEY`:
 
-| Variable | Purpose |
-|----------|---------|
-| `SEQUENCE_PROJECT_ACCESS_KEY` | Project access key (from `setup`) |
-| `SEQUENCE_INDEXER_ACCESS_KEY` | Indexer API key (for `balances`) |
+```bash
+export SEQUENCE_PROJECT_ACCESS_KEY=<access-key-from-setup>
+export SEQUENCE_INDEXER_ACCESS_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
+export TRAILS_API_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
+```
 
 **Optional:**
 
@@ -213,7 +214,6 @@ polygon-agent agent reviews --agent-id <id>
 |----------|---------|-------------|
 | `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | `https://agentconnect.polygon.technology/` | URL of the Connector UI that users open in a browser to approve wallet sessions. Override to point at a local dev server (`http://localhost:4444`) or a custom deployment. |
 | `SEQUENCE_DAPP_ORIGIN` | `https://agentconnect.polygon.technology` | Origin passed to the wallet during session creation. Identifies which dapp is requesting access. Override only if running the connector under a different domain. |
-| `TRAILS_API_KEY` | Falls back to project access key | API key for Trails transaction indexing. |
 
 ---
 
