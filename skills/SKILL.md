@@ -29,7 +29,7 @@ description: Complete Polygon agent toolkit. Session-based smart contract wallet
 ### Optional
 | Variable | Default |
 |----------|---------|
-| `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | `https://agentconnect.staging.polygon.technology/` |
+| `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | `https://agentconnect.polygon.technology/` |
 | `SEQUENCE_DAPP_ORIGIN` | Same as connector URL origin |
 | `TRAILS_API_KEY` | Falls back to `SEQUENCE_PROJECT_ACCESS_KEY` |
 | `TRAILS_TOKEN_MAP_JSON` | Token-directory lookup |
