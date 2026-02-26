@@ -211,8 +211,8 @@ polygon-agent agent reviews --agent-id <id>
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | `https://agentconnect.staging.polygon.technology/` | URL of the Connector UI that users open in a browser to approve wallet sessions. Override to point at a local dev server (`http://localhost:4444`) or a custom deployment. |
-| `SEQUENCE_DAPP_ORIGIN` | `https://agentconnect.staging.polygon.technology` | Origin passed to the wallet during session creation. Identifies which dapp is requesting access. Override only if running the connector under a different domain. |
+| `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | `https://agentconnect.polygon.technology/` | URL of the Connector UI that users open in a browser to approve wallet sessions. Override to point at a local dev server (`http://localhost:4444`) or a custom deployment. |
+| `SEQUENCE_DAPP_ORIGIN` | `https://agentconnect.polygon.technology` | Origin passed to the wallet during session creation. Identifies which dapp is requesting access. Override only if running the connector under a different domain. |
 | `TRAILS_API_KEY` | Falls back to project access key | API key for Trails transaction indexing. |
 
 ---
