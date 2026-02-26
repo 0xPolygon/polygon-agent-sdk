@@ -3,7 +3,8 @@ name: Deploy to Cloudflare
 on:
   push:
     branches:
-      - main
+      - main       # ✅ production branch
+      - staging    # ✅ staging branch
     paths:
       - 'connector-ui/**'
 
@@ -39,14 +40,22 @@ jobs:
           VITE_DAPP_ORIGIN: ${{ secrets.VITE_DAPP_ORIGIN }}
           VITE_INDEXER_ACCESS_KEY: ${{ secrets.VITE_INDEXER_ACCESS_KEY }}
 
+      # =========================
+      # STAGING DEPLOY
+      # =========================
       - name: Deploy to staging
+        if: github.ref == 'refs/heads/staging'   # ✅ staging branch
         run: pnpm wrangler deploy --env staging
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CF_WORKER_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_WORKER_ACCOUNT_ID }}
 
-      # - name: Deploy to production
-      #   run: pnpm wrangler deploy --env production
-      #   env:
-      #     CLOUDFLARE_API_TOKEN: ${{ secrets.CF_WORKER_API_TOKEN }}
-      #     CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_WORKER_ACCOUNT_ID }}
+      # =========================
+      # PRODUCTION DEPLOY
+      # =========================
+      - name: Deploy to production
+        if: github.ref == 'refs/heads/main'   # ✅ main branch production
+        run: pnpm wrangler deploy --env production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_WORKER_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_WORKER_ACCOUNT_ID }}
