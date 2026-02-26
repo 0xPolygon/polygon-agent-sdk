@@ -78,7 +78,7 @@ polygon-agent wallet create \
 ```bash
 polygon-agent fund
 ```
-Opens a Trails widget URL pre-filled with your wallet address. Open the URL in a browser to swap/bridge tokens into your wallet.
+Opens a Trails widget URL pre-filled with your wallet address. Open the URL in a browser to swap/bridge tokens into your wallet. Funding with USDC is sufficient — the SDK uses USDC to pay for gas fees, so you don't need native POL to transact.
 
 ---
 
@@ -94,8 +94,8 @@ Mints ERC-721 NFT with `agentId`. Check transaction for Registered event.
 ## Phase 4: Token Operations
 
 ```bash
-# Balances
-export SEQUENCE_INDEXER_ACCESS_KEY=<indexer-key>
+# Balances (SEQUENCE_INDEXER_ACCESS_KEY is your project access key from Phase 1)
+export SEQUENCE_INDEXER_ACCESS_KEY=<access-key-from-phase-1>
 polygon-agent balances
 
 # Send POL (via ValueForwarder)
@@ -143,7 +143,7 @@ Omit `--broadcast` for dry-run preview.
 ## Environment Variables
 
 **Required**:
-`SEQUENCE_PROJECT_ACCESS_KEY` (from setup), `SEQUENCE_INDEXER_ACCESS_KEY` (for balance checks)
+`SEQUENCE_PROJECT_ACCESS_KEY` (from setup), `SEQUENCE_INDEXER_ACCESS_KEY` (same value — your project access key from setup)
 
 **Defaults** (override if needed):
 `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` → `https://agentconnect.polygon.technology/`
