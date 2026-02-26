@@ -11,3 +11,4 @@ export const relayerUrl = (import.meta.env.VITE_RELAYER_URL as string | undefine
 // Pass the base gateway URL; the Sequence SDK composes the final URL with the access key.
 export const nodesUrl =
   (import.meta.env.VITE_NODES_URL as string | undefined) || 'https://nodes.sequence.app/{network}'
+
