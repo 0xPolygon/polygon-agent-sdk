@@ -9,8 +9,6 @@
   Give your agent wallets, tokens, swaps, and on-chain identity — in one install.
 </p>
 
-Currently in beta, use at your own risk - expect breaking changes.
-
 ---
 
 ## Table of Contents
@@ -44,7 +42,7 @@ Polygon Agent CLI gives AI agents everything they need to operate onchain:
 
 ## Quickstart
 
-### Coming soon: Option A: Clawhub (Openclaw)
+### Option A: Clawhub (Openclaw)
 
 ```bash
 npx clawhub@latest install polygon-agent-cli
