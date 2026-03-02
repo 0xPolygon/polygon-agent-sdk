@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>End-to-end blockchain toolkit for AI agents on Polygon.</strong><br/>
-  Give your agent wallets, tokens, swaps, and on-chain identity — in one install.
+  Give your agent wallets, tokens, swaps, and on-chain identity. One install.
 </p>
 
 ---
@@ -16,8 +16,8 @@
 - [Overview](#overview)
 - [Quickstart](#quickstart)
 - [Core Components](#core-components)
-  - [Sequence — Wallet Infrastructure](#sequence--wallet-infrastructure)
-  - [Trails — Swapping, Bridging, and onchain actions](#trails--defi-operations)
+  - [Sequence: Wallet Infrastructure](#sequence-wallet-infrastructure)
+  - [Trails: Swapping, Bridging, and onchain actions](#trails-swapping-bridging-and-defi-actions)
   - [Onchain Identity](#polygon-chain--on-chain-identity)
 - [Plugins & Skills](#plugins--skills)
 - [CLI Reference](#cli-reference)
@@ -48,7 +48,7 @@ Polygon Agent CLI gives AI agents everything they need to operate onchain:
 npx clawhub@latest install polygon-agent-cli
 ```
 
-This installs the Polygon Agent CLI as a skill your agent can use. Once installed, your agent has access to wallet management, token operations, DEX swaps, and on-chain identity — all through the `polygon-agent` CLI.
+This installs the Polygon Agent CLI as a skill your agent can use. Once installed, your agent has access to wallet management, token operations, DEX swaps, and on-chain identity, all through the `polygon-agent` CLI.
 
 ### Coming soon: Option B: Claude
 
@@ -66,12 +66,12 @@ cd polygon-agent-kit
 npm install
 ```
 
-### After install — get your agent running
+### After install: get your agent running
 
 Once the skill is installed, your agent (or you) can run:
 
 ```bash
-# 1. Setup — creates EOA, authenticates, gets project access key
+# 1. Setup: creates EOA, authenticates, gets project access key
 polygon-agent setup --name "MyAgent"
 
 # 2. Set your access key
@@ -101,7 +101,7 @@ polygon-agent agent register --name "MyAgent"
 
 The CLI is built on three pillars to enable end to end onchain payments with your agents.
 
-### Sequence — Wallet Infrastructure
+### Sequence: Wallet Infrastructure
 
 [Sequence](https://sequence.xyz) powers all wallet operations, RPC access, and indexing.
 
@@ -113,7 +113,7 @@ The CLI is built on three pillars to enable end to end onchain payments with you
 
 Wallet sessions are created through a secure handshake between the CLI, the Connector UI, and the Sequence Ecosystem Wallet. Session permissions let you cap spending per token, whitelist contracts, and set time-based expiry and to mitigate against prompt injection attacks.
 
-### Trails — Swapping, Bridging, and DeFi Actions
+### Trails: Swapping, Bridging, and DeFi Actions
 
 [Trails](https://sequence.xyz/trails) handles swapping, bridging, and onchain interactions enabling you to call any smart contract function and pay with any token. Trails handles it under the hood in a single transaction for your agent.
 
@@ -148,7 +148,7 @@ The CLI ships with agent-friendly documentation designed to be consumed directly
 | **Openclaw** | `npx clawhub@latest install polygon-agent-cli` |
 | **Claude** | `claude skill add --url https://github.com/0xPolygon/polygon-agent-kit` |
 
-Once installed, the agent receives the full skill context — including wallet setup, token operations, and ERC-8004 registration — and can execute autonomously.
+Once installed, the agent receives the full skill context — including wallet setup, token operations, and ERC-8004 registration, and can execute autonomously.
 
 See [`skills/SKILL.md`](skills/SKILL.md) for the full agent-consumable reference and [`skills/QUICKSTART.md`](skills/QUICKSTART.md) for the 4-phase setup guide.
 
@@ -198,7 +198,7 @@ polygon-agent agent reviews --agent-id <id>
 
 ## Environment Variables
 
-**One key covers everything** — `SEQUENCE_INDEXER_ACCESS_KEY` and `TRAILS_API_KEY` are the same value as `SEQUENCE_PROJECT_ACCESS_KEY`:
+**One key covers everything:** `SEQUENCE_INDEXER_ACCESS_KEY` and `TRAILS_API_KEY` are the same value as `SEQUENCE_PROJECT_ACCESS_KEY`:
 
 ```bash
 export SEQUENCE_PROJECT_ACCESS_KEY=<access-key-from-setup>
@@ -252,7 +252,7 @@ polygon-agent-kit/
 ├── cli/                    # CLI entry point + commands
 │   ├── polygon-agent.mjs
 │   └── commands/           # builder, wallet, operations, registry
-├── connector-ui/           # React app — wallet connect bridge
+├── connector-ui/           # React app, wallet connect bridge
 ├── contracts/              # ERC-8004 ABIs
 ├── lib/                    # Shared utils (storage, ethauth, tokens)
 ├── skills/                 # Agent-friendly docs (SKILL.md, QUICKSTART.md)
