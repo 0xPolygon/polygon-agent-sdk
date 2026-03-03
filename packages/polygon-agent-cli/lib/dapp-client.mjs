@@ -4,10 +4,12 @@
 // Wallet JSON files (~/.polygon-agent/wallets/<name>.json) remain the source of truth.
 // .state.enc files are ephemeral staging — synced from wallet JSON before each DappClient operation.
 
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import fs from 'node:fs';
+
 import { DappClient, TransportMode, jsonRevivers } from '@0xsequence/dapp-client';
+
 import { loadWalletSession } from './storage.mjs';
 
 const STORAGE_DIR = path.join(os.homedir(), '.polygon-agent');

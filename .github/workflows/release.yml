@@ -3,18 +3,18 @@ on:
   workflow_dispatch:
     inputs:
       channel:
-        description: "NPM dist-tag channel to publish to"
+        description: 'NPM dist-tag channel to publish to'
         required: true
-        default: "latest"
+        default: 'latest'
         type: choice
         options:
           - dev
           - beta
           - latest
       branch:
-        description: "Branch to release from"
+        description: 'Branch to release from'
         required: false
-        default: "main"
+        default: 'main'
 
 permissions:
   contents: write
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-          cache: "pnpm"
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

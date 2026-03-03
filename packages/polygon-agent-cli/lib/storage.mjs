@@ -2,10 +2,10 @@
 // Simple file-based storage with AES-256-GCM encryption
 // ~/.polygon-agent/ structure
 
-import fs from 'node:fs';
-import path from 'node:path';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import fs from 'node:fs';
 import os from 'node:os';
+import path from 'node:path';
 
 const STORAGE_DIR = path.join(os.homedir(), '.polygon-agent');
 const ENCRYPTION_KEY_FILE = path.join(STORAGE_DIR, '.encryption-key');

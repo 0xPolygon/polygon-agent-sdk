@@ -82,11 +82,9 @@ function encodeClaimsToBase64(claims) {
  * @returns The encoded proof string
  */
 export async function generateEthAuthProof(privateKey, customClaims) {
-  if (!privateKey.startsWith('0x')) {
-    privateKey = '0x' + privateKey;
-  }
+  const prefixedKey = privateKey.startsWith('0x') ? privateKey : '0x' + privateKey;
 
-  const wallet = new ethers.Wallet(privateKey);
+  const wallet = new ethers.Wallet(prefixedKey);
   const now = Math.floor(Date.now() / 1000);
 
   // Build claims with defaults

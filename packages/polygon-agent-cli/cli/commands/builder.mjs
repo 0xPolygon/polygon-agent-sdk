@@ -4,6 +4,7 @@
 // Step 3: Create project and get access key
 
 import { ethers } from 'ethers';
+
 import { generateEthAuthProof } from '../../lib/ethauth.mjs';
 import { saveBuilderConfig, loadBuilderConfig } from '../../lib/storage.mjs';
 import { getArg, hasFlag, generateAgentName } from '../../lib/utils.mjs';

@@ -5,7 +5,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import { Contract, Interface } from 'ethers';
+
 import { runDappClientTx } from '../../lib/dapp-client.mjs';
 import {
   getArg,

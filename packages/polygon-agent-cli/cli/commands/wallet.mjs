@@ -2,13 +2,15 @@
 // Renamed from create-request → wallet create
 // Renamed from ingest-session → wallet start-session
 
+import { spawn, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn, execFileSync } from 'node:child_process';
+
 import nacl from 'tweetnacl';
 import sealedbox from 'tweetnacl-sealedbox-js';
+
 import {
   saveWalletSession,
   loadWalletSession,

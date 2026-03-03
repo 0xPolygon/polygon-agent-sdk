@@ -1,8 +1,9 @@
 // Operations commands - balances, send, swap
 // Uses shared dapp-client wrapper for transaction execution
 
-import { loadWalletSession, loadBuilderConfig } from '../../lib/storage.mjs';
 import { runDappClientTx } from '../../lib/dapp-client.mjs';
+import { loadWalletSession, loadBuilderConfig } from '../../lib/storage.mjs';
+import { resolveErc20BySymbol } from '../../lib/token-directory.mjs';
 import {
   getArg,
   getArgs,
@@ -12,7 +13,6 @@ import {
   parseUnits,
   getExplorerUrl
 } from '../../lib/utils.mjs';
-import { resolveErc20BySymbol } from '../../lib/token-directory.mjs';
 
 // Get per-chain indexer URL
 function getChainIndexerUrl(chainId) {

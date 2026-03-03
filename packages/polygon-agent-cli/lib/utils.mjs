@@ -1,6 +1,7 @@
 // Utility functions for polygon-agent-cli
 
 import fs from 'node:fs';
+
 import { networks } from '@0xsequence/network';
 
 // Parse command-line argument

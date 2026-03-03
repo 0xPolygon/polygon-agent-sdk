@@ -6,12 +6,23 @@
   "packageManager": "pnpm@10.30.3",
   "scripts": {
     "prepare": "husky",
+    "lint": "eslint . && prettier --check .",
+    "format": "eslint . --fix && prettier --write .",
+    "format:check": "prettier --check .",
     "polygon-agent": "node packages/polygon-agent-cli/cli/polygon-agent.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.2",
     "@commitlint/config-conventional": "^20.4.2",
+    "eslint": "^9.39.3",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import-x": "^4.16.1",
+    "eslint-plugin-perfectionist": "^5.6.0",
+    "globals": "^17.4.0",
     "husky": "^9.1.7",
-    "lerna": "^9.0.5"
+    "lerna": "^9.0.5",
+    "prettier": "^3.0.0",
+    "typescript-eslint": "^8.56.1"
   }
 }
