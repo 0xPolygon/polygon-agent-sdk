@@ -4,7 +4,13 @@
   "description": "CLI + Agent Skills for building on-chain agents on Polygon",
   "type": "module",
   "packageManager": "pnpm@10.30.3",
+  "scripts": {
+    "prepare": "husky"
+  },
   "devDependencies": {
+    "@commitlint/cli": "^20.4.2",
+    "@commitlint/config-conventional": "^20.4.2",
+    "husky": "^9.1.7",
     "lerna": "^9.0.5"
   }
 }
