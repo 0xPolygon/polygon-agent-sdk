@@ -5,7 +5,8 @@
   "type": "module",
   "packageManager": "pnpm@10.30.3",
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "polygon-agent": "node packages/polygon-agent-cli/cli/polygon-agent.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.2",

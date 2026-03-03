@@ -55,20 +55,29 @@ This installs the Polygon Agent CLI as a skill your agent can use. Once installe
 Add the skill to your Claude project from the repo:
 
 ```bash
-claude skill add --url https://github.com/0xPolygon/polygon-agent-kit
+claude skill add --url https://github.com/0xPolygon/polygon-agent-cli
 ```
 
-### Option C: Manual
+### Option C: npm
 
 ```bash
-git clone https://github.com/0xPolygon/polygon-agent-kit.git
-cd polygon-agent-kit
+npm install -g @polygonlabs/agent-cli
+```
+
+### Option D: From Source
+
+For contributors or local development. Use `pnpm polygon-agent` instead of `polygon-agent` for all commands.
+
+```bash
+git clone https://github.com/0xPolygon/polygon-agent-cli.git
+cd polygon-agent-cli
 pnpm install
+pnpm polygon-agent --help
 ```
 
 ### After install: get your agent running
 
-Once the skill is installed, your agent (or you) can run:
+Once installed (via Options A–C), run the following. If running from source (Option D), prefix `polygon-agent` commands with `pnpm` and run them from the root of the repository (e.g., `pnpm polygon-agent setup --name "MyAgent"`).
 
 ```bash
 # 1. Setup: creates EOA, authenticates, gets project access key
@@ -93,7 +102,7 @@ polygon-agent swap --from USDC --to USDT --amount 5
 polygon-agent agent register --name "MyAgent"
 ```
 
-> Omit `--broadcast` on any command to preview without sending. See [`skills/QUICKSTART.md`](skills/QUICKSTART.md) for the full step-by-step walkthrough.
+> Omit `--broadcast` on any command to preview without sending. See [`QUICKSTART.md`](packages/polygon-agent-cli/skills/QUICKSTART.md) for the full step-by-step walkthrough.
 
 ---
 
@@ -147,11 +156,11 @@ The CLI ships with agent-friendly documentation designed to be consumed directly
 | Distribution | How to install                                                          |
 | ------------ | ----------------------------------------------------------------------- |
 | **Openclaw** | `npx clawhub@latest install polygon-agent-cli`                          |
-| **Claude**   | `claude skill add --url https://github.com/0xPolygon/polygon-agent-kit` |
+| **Claude**   | `claude skill add --url https://github.com/0xPolygon/polygon-agent-cli` |
 
 Once installed, the agent receives the full skill context — including wallet setup, token operations, and ERC-8004 registration, and can execute autonomously.
 
-See [`skills/SKILL.md`](skills/SKILL.md) for the full agent-consumable reference and [`skills/QUICKSTART.md`](skills/QUICKSTART.md) for the 4-phase setup guide.
+See [`SKILL.md`](packages/polygon-agent-cli/skills/SKILL.md) for the full agent-consumable reference and [`QUICKSTART.md`](packages/polygon-agent-cli/skills/QUICKSTART.md) for the 4-phase setup guide.
 
 ---
 
@@ -238,29 +247,34 @@ export TRAILS_API_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
 ## Development
 
 ```bash
-# CLI
+# Install dependencies
 pnpm install
-polygon-agent --help
+
+# CLI (via root script)
+pnpm polygon-agent --help
 
 # Connector UI
-cd connector-ui && pnpm install && pnpm dev
+cd packages/connector-ui && pnpm dev
 ```
 
 ### Project Structure
 
 ```text
-polygon-agent-kit/
-├── cli/                    # CLI entry point + commands
-│   ├── polygon-agent.mjs
-│   └── commands/           # builder, wallet, operations, registry
-├── connector-ui/           # React app, wallet connect bridge
-├── contracts/              # ERC-8004 ABIs
-├── lib/                    # Shared utils (storage, ethauth, tokens)
-├── skills/                 # Agent-friendly docs (SKILL.md, QUICKSTART.md)
+polygon-agent-cli/
+├── packages/
+│   ├── polygon-agent-cli/  # CLI package (@polygonlabs/agent-cli)
+│   │   ├── cli/            # Entry point + commands
+│   │   │   ├── polygon-agent.mjs
+│   │   │   └── commands/
+│   │   ├── contracts/      # ERC-8004 ABIs
+│   │   ├── lib/            # Shared utils (storage, ethauth, tokens)
+│   │   └── skills/         # Agent-friendly docs (SKILL.md, QUICKSTART.md)
+│   └── connector-ui/       # React app, wallet connect bridge
+├── pnpm-workspace.yaml
 └── package.json
 ```
 
-**Requirements:** Node.js 20+, pnpm
+**Requirements:** Node.js 22+, pnpm
 
 ---
 

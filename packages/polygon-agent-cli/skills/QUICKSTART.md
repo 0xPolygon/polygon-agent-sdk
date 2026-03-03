@@ -1,6 +1,6 @@
 ---
-name: polygon-agent-kit-quickstart
-description: Quick start guide for Polygon Agent Kit. Get project access key, create wallet with session permissions, register agent onchain, perform token operations. Context-efficient workflow for autonomous agents.
+name: polygon-agent-cli-quickstart
+description: Quick start guide for Polygon Agent CLI. Get project access key, create wallet with session permissions, register agent onchain, perform token operations. Context-efficient workflow for autonomous agents.
 ---
 
 # Polygon Agent Kit - Quick Start
@@ -190,4 +190,4 @@ export TRAILS_API_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
 
 All credentials: `~/.polygon-agent/` (AES-256-GCM encrypted)
 
-Repository: <https://github.com/0xPolygon/polygon-agent-kit>
+Repository: <https://github.com/0xPolygon/polygon-agent-cli>

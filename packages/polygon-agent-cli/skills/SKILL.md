@@ -1,5 +1,5 @@
 ---
-name: polygon-agent-kit
+name: polygon-agent-cli
 description: Complete Polygon agent toolkit. Session-based smart contract wallets (Sequence), token ops (send/swap/bridge/deposit via Trails), ERC-8004 on-chain identity + reputation, x402 micropayments. Single CLI entry point, AES-256-GCM encrypted storage.
 ---
 
@@ -7,8 +7,8 @@ description: Complete Polygon agent toolkit. Session-based smart contract wallet
 
 ## Prerequisites
 
-- Node.js 20+
-- Install globally: `npm install -g github:0xPolygon/polygon-agent-kit`
+- Node.js 22+
+- Install globally: `npm install -g @polygonlabs/agent-cli`
 - Entry point: `polygon-agent <command>`
 - Storage: `~/.polygon-agent/` (AES-256-GCM encrypted)
 
@@ -49,25 +49,25 @@ export TRAILS_API_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
 
 ```bash
 # Phase 1: Setup (creates EOA + Sequence project, returns access key)
-node cli/polygon-agent.mjs setup --name "MyAgent"
+polygon-agent setup --name "MyAgent"
 # → save privateKey (not shown again), eoaAddress, accessKey
 
 # Phase 2: Create ecosystem wallet (auto-waits for browser approval)
 export SEQUENCE_PROJECT_ACCESS_KEY=<accessKey>
-node cli/polygon-agent.mjs wallet create --usdc-limit 100 --native-limit 5
+polygon-agent wallet create --usdc-limit 100 --native-limit 5
 
 # Phase 3: Fund wallet
-node cli/polygon-agent.mjs fund
+polygon-agent fund
 # → reads walletAddress from session, builds Trails widget URL with toAddress=<walletAddress>
 # → ALWAYS run this command to get the URL — never construct it manually or hardcode any address
 # → send the returned `fundingUrl` to the user; `walletAddress` in the output confirms the recipient
 
 # Phase 4: Verify (SEQUENCE_INDEXER_ACCESS_KEY is the same as your project access key)
 export SEQUENCE_INDEXER_ACCESS_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
-node cli/polygon-agent.mjs balances
+polygon-agent balances
 
 # Phase 5: Register agent on-chain (ERC-8004, Polygon mainnet)
-node cli/polygon-agent.mjs agent register --name "MyAgent" --broadcast
+polygon-agent agent register --name "MyAgent" --broadcast
 # → mints ERC-721 NFT, emits agentId in Registered event
 # → use agentId for reputation queries and feedback
 ```
