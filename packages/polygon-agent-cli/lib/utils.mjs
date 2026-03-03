@@ -1,4 +1,4 @@
-// Utility functions for polygon-agent-kit
+// Utility functions for polygon-agent-cli
 
 import fs from 'node:fs';
 import { networks } from '@0xsequence/network';

@@ -1,4 +1,4 @@
-// Storage module for polygon-agent-kit
+// Storage module for polygon-agent-cli
 // Simple file-based storage with AES-256-GCM encryption
 // ~/.polygon-agent/ structure
 

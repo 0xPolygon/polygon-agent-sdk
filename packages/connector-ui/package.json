@@ -1,5 +1,5 @@
 {
-  "name": "@polygon-agent-kit/connector-ui",
+  "name": "@polygonlabs/agent-connector-ui",
   "private": true,
   "version": "1.0.0",
   "type": "module",
