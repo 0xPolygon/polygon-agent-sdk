@@ -18,7 +18,7 @@
 - [Core Components](#core-components)
   - [Sequence: Wallet Infrastructure](#sequence-wallet-infrastructure)
   - [Trails: Swapping, Bridging, and onchain actions](#trails-swapping-bridging-and-defi-actions)
-  - [Onchain Identity](#polygon-chain--on-chain-identity)
+  - [Onchain Identity](#onchain-agentic-identity)
 - [Plugins & Skills](#plugins--skills)
 - [CLI Reference](#cli-reference)
 - [Environment Variables](#environment-variables)
@@ -63,7 +63,7 @@ claude skill add --url https://github.com/0xPolygon/polygon-agent-kit
 ```bash
 git clone https://github.com/0xPolygon/polygon-agent-kit.git
 cd polygon-agent-kit
-npm install
+pnpm install
 ```
 
 ### After install: get your agent running
@@ -86,8 +86,8 @@ polygon-agent fund
 # 5. Start operating (SEQUENCE_INDEXER_ACCESS_KEY is the same as your project access key)
 export SEQUENCE_INDEXER_ACCESS_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
 polygon-agent balances
-polygon-agent send --to 0x... --amount 1.0 
-polygon-agent swap --from USDC --to USDT --amount 5 
+polygon-agent send --to 0x... --amount 1.0
+polygon-agent swap --from USDC --to USDT --amount 5
 
 # 6. Register your agent on-chain
 polygon-agent agent register --name "MyAgent"
@@ -105,11 +105,11 @@ The CLI is built on three pillars to enable end to end onchain payments with you
 
 [Sequence](https://sequence.xyz) powers all wallet operations, RPC access, and indexing.
 
-| Capability | What it does | CLI command |
-|------------|-------------|-------------|
-| **Wallets** | Session-based smart contract wallets (Account Abstraction) with scoped spending permissions | `wallet create`, `wallet list` |
-| **RPCs** | Load balanced RPCs cross-chain for onchain interactions and node queries | Used internally by all commands |
-| **Indexer** | Token balance queries and transaction history across ERC-20/721/1155 | `balances` |
+| Capability  | What it does                                                                                | CLI command                     |
+| ----------- | ------------------------------------------------------------------------------------------- | ------------------------------- |
+| **Wallets** | Session-based smart contract wallets (Account Abstraction) with scoped spending permissions | `wallet create`, `wallet list`  |
+| **RPCs**    | Load balanced RPCs cross-chain for onchain interactions and node queries                    | Used internally by all commands |
+| **Indexer** | Token balance queries and transaction history across ERC-20/721/1155                        | `balances`                      |
 
 Wallet sessions are created through a secure handshake between the CLI, the Connector UI, and the Sequence Ecosystem Wallet. Session permissions let you cap spending per token, whitelist contracts, and set time-based expiry and to mitigate against prompt injection attacks.
 
@@ -117,23 +117,24 @@ Wallet sessions are created through a secure handshake between the CLI, the Conn
 
 [Trails](https://sequence.xyz/trails) handles swapping, bridging, and onchain interactions enabling you to call any smart contract function and pay with any token. Trails handles it under the hood in a single transaction for your agent.
 
-| Capability | What it does | CLI command |
-|------------|-------------|-------------|
-| **Bridging** | Move assets cross-chain into your Polygon wallet and fund the initial flows to your wallet | `fund` |
-| **Swapping** | Token swaps with configurable slippage seamlessly built in | `swap` |
-| **Actions** | Composable onchain operations (deposit into a DeFi vault, stake with your favorite protocol) | `send`, `deposit`, `send-token` |
+| Capability   | What it does                                                                                 | CLI command                     |
+| ------------ | -------------------------------------------------------------------------------------------- | ------------------------------- |
+| **Bridging** | Move assets cross-chain into your Polygon wallet and fund the initial flows to your wallet   | `fund`                          |
+| **Swapping** | Token swaps with configurable slippage seamlessly built in                                   | `swap`                          |
+| **Actions**  | Composable onchain operations (deposit into a DeFi vault, stake with your favorite protocol) | `send`, `deposit`, `send-token` |
 
 ### Onchain Agentic Identity
 
 Native contracts for agent identity, reputation, and emerging payment standards.
 
-| Capability | What it does | CLI command |
-|------------|-------------|-------------|
-| **ERC-8004** | Register agents as ERC-721 NFTs with metadata and on-chain reputation | `agent register`, `agent reputation`, `agent feedback` |
-| **x402** | HTTP-native micropayment protocol for agentic payments to your favorite services
-| **Native Apps** | Direct interaction with smart contracts | Via `--contract` whitelisting |
+| Capability      | What it does                                                                     | CLI command                                            |
+| --------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| **ERC-8004**    | Register agents as ERC-721 NFTs with metadata and on-chain reputation            | `agent register`, `agent reputation`, `agent feedback` |
+| **x402**        | HTTP-native micropayment protocol for agentic payments to your favorite services | `x402-pay`                                             |
+| **Native Apps** | Direct interaction with smart contracts                                          | Via `--contract` whitelisting                          |
 
 **ERC-8004 contracts on Polygon:**
+
 - Identity Registry: `0x8004A169FB4a3325136EB29fA0ceB6D2e539a432`
 - Reputation Registry: `0x8004BAa17C55a88189AE136b182e5fdA19dE9b63`
 
@@ -143,10 +144,10 @@ Native contracts for agent identity, reputation, and emerging payment standards.
 
 The CLI ships with agent-friendly documentation designed to be consumed directly by AI agents.
 
-| Distribution | How to install |
-|-------------|----------------|
-| **Openclaw** | `npx clawhub@latest install polygon-agent-cli` |
-| **Claude** | `claude skill add --url https://github.com/0xPolygon/polygon-agent-kit` |
+| Distribution | How to install                                                          |
+| ------------ | ----------------------------------------------------------------------- |
+| **Openclaw** | `npx clawhub@latest install polygon-agent-cli`                          |
+| **Claude**   | `claude skill add --url https://github.com/0xPolygon/polygon-agent-kit` |
 
 Once installed, the agent receives the full skill context — including wallet setup, token operations, and ERC-8004 registration, and can execute autonomously.
 
@@ -187,12 +188,12 @@ polygon-agent agent reviews --agent-id <id>
 
 ### Smart Defaults
 
-| Default | Value | Override |
-|---------|-------|----------|
-| Wallet name | `main` | `--name <name>` |
-| Chain | `polygon` | `--chain <name\|id>` |
-| Wallet create | Auto-wait for approval | `--no-wait` |
-| Broadcast | Dry-run (preview) | `--broadcast` |
+| Default       | Value                  | Override             |
+| ------------- | ---------------------- | -------------------- |
+| Wallet name   | `main`                 | `--name <name>`      |
+| Chain         | `polygon`              | `--chain <name\|id>` |
+| Wallet create | Auto-wait for approval | `--no-wait`          |
+| Broadcast     | Dry-run (preview)      | `--broadcast`        |
 
 ---
 
@@ -208,10 +209,10 @@ export TRAILS_API_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
 
 **Optional:**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
+| Variable                           | Default                                    | Description                                                                                                                                                                |
+| ---------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SEQUENCE_ECOSYSTEM_CONNECTOR_URL` | `https://agentconnect.polygon.technology/` | URL of the Connector UI that users open in a browser to approve wallet sessions. Override to point at a local dev server (`http://localhost:4444`) or a custom deployment. |
-| `SEQUENCE_DAPP_ORIGIN` | `https://agentconnect.polygon.technology` | Origin passed to the wallet during session creation. Identifies which dapp is requesting access. Override only if running the connector under a different domain. |
+| `SEQUENCE_DAPP_ORIGIN`             | `https://agentconnect.polygon.technology`  | Origin passed to the wallet during session creation. Identifies which dapp is requesting access. Override only if running the connector under a different domain.          |
 
 ---
 
@@ -224,13 +225,13 @@ export TRAILS_API_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
 
 ## Troubleshooting
 
-| Issue | Fix |
-|-------|-----|
-| `Missing SEQUENCE_PROJECT_ACCESS_KEY` | Run `setup` first |
-| Session expired | Re-run `wallet create` |
-| Insufficient funds | Run `fund` to top up your wallet |
-| Transaction failed | Omit `--broadcast` to dry-run first |
-| Callback timeout | Increase with `--timeout 600` |
+| Issue                                 | Fix                                 |
+| ------------------------------------- | ----------------------------------- |
+| `Missing SEQUENCE_PROJECT_ACCESS_KEY` | Run `setup` first                   |
+| Session expired                       | Re-run `wallet create`              |
+| Insufficient funds                    | Run `fund` to top up your wallet    |
+| Transaction failed                    | Omit `--broadcast` to dry-run first |
+| Callback timeout                      | Increase with `--timeout 600`       |
 
 ---
 
@@ -238,7 +239,7 @@ export TRAILS_API_KEY=$SEQUENCE_PROJECT_ACCESS_KEY
 
 ```bash
 # CLI
-npm install
+pnpm install
 polygon-agent --help
 
 # Connector UI
@@ -247,7 +248,7 @@ cd connector-ui && pnpm install && pnpm dev
 
 ### Project Structure
 
-```
+```text
 polygon-agent-kit/
 ├── cli/                    # CLI entry point + commands
 │   ├── polygon-agent.mjs
@@ -259,7 +260,7 @@ polygon-agent-kit/
 └── package.json
 ```
 
-**Requirements:** Node.js 20+, pnpm (for connector-ui)
+**Requirements:** Node.js 20+, pnpm
 
 ---
 

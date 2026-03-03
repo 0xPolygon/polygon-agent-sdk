@@ -1,0 +1,71 @@
+name: Release Packages
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "NPM dist-tag channel to publish to"
+        required: true
+        default: "latest"
+        type: choice
+        options:
+          - dev
+          - beta
+          - latest
+      branch:
+        description: "Branch to release from"
+        required: false
+        default: "main"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.SEMANTIC_RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.SEMANTIC_RELEASE_BOT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+          ref: ${{ github.event.inputs.branch || 'main' }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Release with Lerna
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          git config --global user.email "semantic-release-bot@users.noreply.github.com"
+          git config --global user.name "Semantic Release Bot"
+
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+
+          DIST_TAG="${{ github.event.inputs.channel || 'latest' }}"
+          echo "Publishing to channel: $DIST_TAG"
+
+          if [[ "$DIST_TAG" != "dev" && "$DIST_TAG" != "beta" && "$DIST_TAG" != "latest" ]]; then
+            echo "Invalid dist-tag: $DIST_TAG. Defaulting to latest."
+            DIST_TAG="latest"
+          fi
+
+          if [[ "$DIST_TAG" == "latest" ]]; then
+            pnpm exec lerna version --conventional-commits --conventional-graduate --create-release github --yes
+          else
+            pnpm exec lerna version --conventional-commits --conventional-prerelease --preid "$DIST_TAG" --create-release github --yes
+          fi
+          pnpm exec lerna publish from-package --dist-tag "$DIST_TAG" --yes

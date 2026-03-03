@@ -1,0 +1,34 @@
+{
+  "name": "@polygonlabs/agent-cli",
+  "version": "0.1.2",
+  "description": "CLI + Agent Skills for building on-chain agents on Polygon",
+  "type": "module",
+  "bin": {
+    "polygon-agent": "./cli/polygon-agent.mjs"
+  },
+  "dependencies": {
+    "@0xsequence/abi": "3.0.0-beta.16",
+    "@0xsequence/api": "3.0.0-beta.16",
+    "@0xsequence/builder": "3.0.0-beta.16",
+    "@0xsequence/dapp-client": "3.0.0-beta.16",
+    "@0xsequence/dapp-client-cli": "0.1.2",
+    "@0xsequence/indexer": "^2.3.40",
+    "@0xsequence/network": "^2.3.40",
+    "@0xsequence/relayer": "3.0.0-beta.16",
+    "@0xsequence/wallet-core": "3.0.0-beta.16",
+    "@0xsequence/wallet-primitives": "3.0.0-beta.16",
+    "@0xsequence/wallet-wdk": "3.0.0-beta.16",
+    "@0xtrails/api": "^0.10.4",
+    "@x402/core": "^2.3.1",
+    "@x402/evm": "^2.3.1",
+    "@x402/fetch": "^2.3.0",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.0",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-sealedbox-js": "^1.2.0",
+    "viem": "^2.45.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
