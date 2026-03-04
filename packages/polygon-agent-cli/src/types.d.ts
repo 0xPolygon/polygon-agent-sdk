@@ -12,6 +12,7 @@ declare module 'tweetnacl-sealedbox-js' {
   export function overheadLength(): number;
 }
 
+// FIXME: These should be exports from `dapp-client-cli`, but the package has no exports which breaks TS being able to resolve them
 declare module '@0xsequence/dapp-client-cli/dist/state.js' {
   export class StateManager {
     constructor(statePath: string, passphrase: string);
