@@ -3,3 +3,6 @@ node_modules/
 .env.local
 *.log
 .DS_Store
+/.idea/workspace.xml
+.nx/
+*/**/.nx

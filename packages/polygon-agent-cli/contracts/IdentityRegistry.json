@@ -1,0 +1,126 @@
+[
+  {
+    "inputs": [],
+    "name": "register",
+    "outputs": [{ "internalType": "uint256", "name": "agentId", "type": "uint256" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "string", "name": "agentURI", "type": "string" }],
+    "name": "register",
+    "outputs": [{ "internalType": "uint256", "name": "agentId", "type": "uint256" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "agentURI", "type": "string" },
+      {
+        "components": [
+          { "internalType": "string", "name": "metadataKey", "type": "string" },
+          { "internalType": "bytes", "name": "metadataValue", "type": "bytes" }
+        ],
+        "internalType": "struct MetadataEntry[]",
+        "name": "metadata",
+        "type": "tuple[]"
+      }
+    ],
+    "name": "register",
+    "outputs": [{ "internalType": "uint256", "name": "agentId", "type": "uint256" }],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "internalType": "string", "name": "newURI", "type": "string" }
+    ],
+    "name": "setAgentURI",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "internalType": "address", "name": "newWallet", "type": "address" },
+      { "internalType": "uint256", "name": "deadline", "type": "uint256" },
+      { "internalType": "bytes", "name": "signature", "type": "bytes" }
+    ],
+    "name": "setAgentWallet",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "agentId", "type": "uint256" }],
+    "name": "getAgentWallet",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "agentId", "type": "uint256" }],
+    "name": "unsetAgentWallet",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "internalType": "string", "name": "metadataKey", "type": "string" },
+      { "internalType": "bytes", "name": "metadataValue", "type": "bytes" }
+    ],
+    "name": "setMetadata",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "internalType": "string", "name": "metadataKey", "type": "string" }
+    ],
+    "name": "getMetadata",
+    "outputs": [{ "internalType": "bytes", "name": "", "type": "bytes" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "tokenId", "type": "uint256" }],
+    "name": "ownerOf",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "tokenId", "type": "uint256" }],
+    "name": "tokenURI",
+    "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "indexed": false, "internalType": "string", "name": "agentURI", "type": "string" },
+      { "indexed": true, "internalType": "address", "name": "owner", "type": "address" }
+    ],
+    "name": "Registered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "agentId", "type": "uint256" },
+      { "indexed": true, "internalType": "string", "name": "indexedMetadataKey", "type": "string" },
+      { "indexed": false, "internalType": "string", "name": "metadataKey", "type": "string" },
+      { "indexed": false, "internalType": "bytes", "name": "metadataValue", "type": "bytes" }
+    ],
+    "name": "MetadataSet",
+    "type": "event"
+  }
+]

@@ -1,0 +1,4 @@
+# Prettier should not format md files, as we use `markdownlint` for that purpose
+*.md
+dist/
+pnpm-lock.yaml

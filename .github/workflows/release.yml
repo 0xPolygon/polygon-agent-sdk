@@ -1,0 +1,70 @@
+name: Publish / Release NPM Packages
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'NPM dist-tag channel to publish to'
+        required: true
+        default: 'latest'
+        type: choice
+        options:
+          - dev
+          - beta
+          - latest
+      branch:
+        description: 'Branch to release from'
+        required: false
+        default: 'main'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.SEMANTIC_RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.SEMANTIC_RELEASE_BOT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+          ref: ${{ github.event.inputs.branch || 'main' }}
+
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Release with Lerna
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          git config --global user.email "semantic-release-bot@users.noreply.github.com"
+          git config --global user.name "Semantic Release Bot"
+
+          DIST_TAG="${{ github.event.inputs.channel || 'latest' }}"
+          echo "Publishing to channel: $DIST_TAG"
+
+          if [[ "$DIST_TAG" != "dev" && "$DIST_TAG" != "beta" && "$DIST_TAG" != "latest" ]]; then
+            echo "Invalid dist-tag: $DIST_TAG. Defaulting to latest."
+            DIST_TAG="latest"
+          fi
+
+          if [[ "$DIST_TAG" == "latest" ]]; then
+            pnpm exec lerna version --conventional-commits --conventional-graduate --create-release github --yes
+          else
+            pnpm exec lerna version --conventional-commits --conventional-prerelease --preid "$DIST_TAG" --create-release github --yes
+          fi
+          pnpm exec lerna publish from-package --dist-tag "$DIST_TAG" --yes
