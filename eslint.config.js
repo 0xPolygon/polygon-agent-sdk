@@ -11,5 +11,7 @@ export default [
     files: ['packages/polygon-agent-cli/**/*.ts'],
     languageOptions: { globals: { ...globals.node } }
   },
-  { ignores: ['.claude/**', '**/dist/**', 'test-smart-wallet-polymarket.mjs', 'x402-test-server/**'] }
+  {
+    ignores: ['.claude/**', '**/dist/**']
+  }
 ];
