@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.30.3",
   "scripts": {
     "prepare": "husky",
-    "lint": "pnpm run lint:ts && prettier --check .",
+    "lint": "concurrently --group --prefix-colors auto 'pnpm:lint:ts' 'pnpm:typecheck' 'prettier --check .'",
     "lint:ts": "eslint .",
     "format": "pnpm run format:ts && prettier --write .",
     "format:ts": "eslint . --fix",
@@ -23,6 +23,7 @@
     "@polygonlabs/apps-team-lint": "^0.1.0",
     "@tsconfig/node24": "^24.0.4",
     "@tsconfig/node-ts": "^23.6.4",
+    "concurrently": "^9.2.1",
     "eslint": "^9.39.3",
     "globals": "^17.4.0",
     "husky": "^9.1.7",
