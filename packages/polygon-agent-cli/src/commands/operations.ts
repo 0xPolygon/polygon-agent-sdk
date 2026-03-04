@@ -743,7 +743,7 @@ export const swapCommand: CommandModule = {
                 ok: false,
                 error: 'Swap intent timed out waiting for completion',
                 intentId,
-                intentStatus: (receipt as any)?.intentStatus ?? null,
+                intentStatus: receipt?.intentReceipt?.status ?? null,
                 hint: `Check status manually with intentId: ${intentId}`
               },
               null,
