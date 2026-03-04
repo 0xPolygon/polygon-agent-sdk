@@ -13,6 +13,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm run build",
     "dev": "node src/index.ts",
     "typecheck": "tsc --noEmit"
   },
