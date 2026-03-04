@@ -988,6 +988,7 @@ export const walletCommand: CommandModule = {
           }),
         handler: (argv) => handleRemove(argv as unknown as RemoveArgs)
       })
-      .demandCommand(1, 'You must specify a wallet subcommand'),
+      .demandCommand(1, '')
+      .showHelpOnFail(true),
   handler: () => {}
 };

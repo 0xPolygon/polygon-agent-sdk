@@ -580,6 +580,7 @@ export const agentCommand: CommandModule = {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         handler: (argv) => handleReviews(argv as any)
       })
-      .demandCommand(1, 'You must specify an agent subcommand'),
+      .demandCommand(1, '')
+      .showHelpOnFail(true),
   handler: () => {}
 };

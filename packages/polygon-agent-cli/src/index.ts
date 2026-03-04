@@ -98,13 +98,15 @@ for (const alias of legacyAliases) {
 
 parser
   .demandCommand(1, '')
+  .showHelpOnFail(true)
   .strict()
   .help()
-  .fail((msg, err) => {
+  .fail((msg, err, yargs) => {
     if (err) {
       console.error(JSON.stringify({ ok: false, error: err.message, stack: err.stack }, null, 2));
-    } else if (msg) {
-      console.error(JSON.stringify({ ok: false, error: msg }, null, 2));
+    } else {
+      yargs.showHelp('error');
+      if (msg) console.error(`\n${msg}`);
     }
     process.exit(1);
   })
