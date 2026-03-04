@@ -411,7 +411,7 @@ async function handleReviews(argv: {
 // --- Main agent command ---
 export const agentCommand: CommandModule = {
   command: 'agent',
-  describe: 'ERC-8004 Agent Registry commands',
+  describe: 'ERC-8004 Agent Registry (register, wallet, metadata, reputation, feedback, reviews)',
   builder: (yargs) =>
     yargs
       .command({

@@ -885,7 +885,7 @@ async function handleRemove(argv: RemoveArgs): Promise<void> {
 // --- Main wallet command ---
 export const walletCommand: CommandModule = {
   command: 'wallet',
-  describe: 'Manage wallets',
+  describe: 'Manage wallets (create, import, list, address, remove)',
   builder: (yargs) =>
     yargs
       .command({
