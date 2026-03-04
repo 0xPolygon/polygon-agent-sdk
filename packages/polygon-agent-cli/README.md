@@ -44,16 +44,10 @@ Polygon Agent CLI gives AI agents everything they need to operate onchain:
 
 ### Recommended: Install on your agent
 
-Install the Polygon Agent CLI as a skill your agent can use — works with your favorite agent harness (Claude, Codex, etc.):
+Install the Polygon Agent CLI as a skill your agent can use — works with Claude Code, Codex, Openclaw, and any agent harness that supports the skills protocol:
 
 ```bash
 npx skills add https://github.com/0xPolygon/polygon-agent-cli
-```
-
-Or install via Clawhub:
-
-```bash
-npx clawhub@latest install polygon-agent-cli
 ```
 
 Once installed, your agent has access to wallet management, token operations, DEX swaps, and on-chain identity, all through the `polygon-agent` CLI.
@@ -155,8 +149,7 @@ The CLI ships with agent-friendly documentation designed to be consumed directly
 
 | Distribution                                | How to install                                              |
 | ------------------------------------------- | ----------------------------------------------------------- |
-| **Skills** (Claude, Codex, etc.) — recommended | `npx skills add https://github.com/0xPolygon/polygon-agent-cli` |
-| **Clawhub**                                 | `npx clawhub@latest install polygon-agent-cli`              |
+| **Skills** (Claude Code, Codex, Openclaw, etc.) — recommended | `npx skills add https://github.com/0xPolygon/polygon-agent-cli` |
 
 Once installed, the agent receives the full skill context — including wallet setup, token operations, and ERC-8004 registration, and can execute autonomously.
 
