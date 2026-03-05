@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.2.2](https://github.com/0xPolygon/polygon-agent-cli/compare/@polygonlabs/agent-cli@0.2.1...@polygonlabs/agent-cli@0.2.2) (2026-03-05)
+
+
+### Bug Fixes
+
+* **agent:** handle empty clients list in reputation command ([4a95561](https://github.com/0xPolygon/polygon-agent-cli/commit/4a955616089b604e10d442461f944403e62a207e))
+
+
+
+
+
 ## [0.2.1](https://github.com/0xPolygon/polygon-agent-cli/compare/@polygonlabs/agent-cli@0.2.0...@polygonlabs/agent-cli@0.2.1) (2026-03-05)
 
 
