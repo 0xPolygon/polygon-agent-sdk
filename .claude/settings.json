@@ -1,5 +1,5 @@
 {
   "permissions": {
-    "allow": ["WebFetch(gist.githubusercontent.com)"]
+    "allow": ["WebFetch(domain:gist.githubusercontent.com)"]
   }
 }
