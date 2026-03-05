@@ -1,23 +1,33 @@
 {
   "name": "@polygonlabs/agent-cli",
-  "version": "0.1.3-dev.3",
+  "version": "0.2.2",
   "description": "CLI + Agent Skills for building on-chain agents on Polygon",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0xPolygon/polygon-agent-cli",
+    "directory": "packages/polygon-agent-cli"
+  },
   "type": "module",
   "bin": {
-    "polygon-agent": "cli/polygon-agent.mjs"
+    "polygon-agent": "dist/index.js"
   },
   "files": [
-    "cli",
+    "dist",
     "contracts",
-    "lib",
     "skills"
   ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm run build",
+    "dev": "node src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@0xsequence/abi": "3.0.0-beta.16",
     "@0xsequence/api": "3.0.0-beta.16",
     "@0xsequence/builder": "3.0.0-beta.16",
     "@0xsequence/dapp-client": "3.0.0-beta.16",
-    "@0xsequence/dapp-client-cli": "0.1.2",
+    "@0xsequence/dapp-client-cli": "0.1.5",
     "@0xsequence/indexer": "^2.3.40",
     "@0xsequence/network": "^2.3.40",
     "@0xsequence/relayer": "3.0.0-beta.16",
@@ -32,7 +42,11 @@
     "ethers": "^6.13.0",
     "tweetnacl": "^1.0.3",
     "tweetnacl-sealedbox-js": "^1.2.0",
-    "viem": "^2.45.3"
+    "viem": "^2.45.3",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/yargs": "^17.0.33"
   },
   "engines": {
     "node": ">=20.0.0"

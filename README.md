@@ -1,7 +1,7 @@
 # Polygon Agent CLI
 
 <p align="center">
-  <img src="assets/agents-cli-image.png" alt="Polygon Agent CLI" width="700" />
+  <img src="assets/PolygonAgentsCLI-Architecture.png" alt="Polygon Agent CLI" width="700" />
 </p>
 
 Monorepo for the Polygon Agent CLI — everything AI agents need to operate onchain.
@@ -37,7 +37,7 @@ pnpm install
 pnpm polygon-agent --help
 ```
 
-Requirements: Node.js 22+, pnpm
+Requirements: Node.js 20+, pnpm
 
 ## License
 

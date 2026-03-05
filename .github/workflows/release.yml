@@ -63,7 +63,7 @@ jobs:
           fi
 
           if [[ "$DIST_TAG" == "latest" ]]; then
-            pnpm exec lerna version --conventional-commits --conventional-graduate --create-release github --yes
+            pnpm exec lerna version --conventional-commits --create-release github --yes
           else
             pnpm exec lerna version --conventional-commits --conventional-prerelease --preid "$DIST_TAG" --create-release github --yes
           fi
