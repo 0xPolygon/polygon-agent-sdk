@@ -521,18 +521,19 @@ async function handleSell(argv: {
   }
 }
 
-async function handlePositions(argv: { wallet?: string }): Promise<void> {
-  const walletName = argv.wallet ?? 'main';
+async function handlePositions(): Promise<void> {
   try {
-    const session = await loadWalletSession(walletName);
-    if (!session) throw new Error(`Wallet not found: ${walletName}`);
+    const privateKey = await loadPolymarketKey();
+    const { privateKeyToAccount } = await import('viem/accounts');
+    const account = privateKeyToAccount(privateKey as `0x${string}`);
+    const proxyWalletAddress = await getPolymarketProxyWalletAddress(account.address);
 
-    const positions = await getPositions(session.walletAddress);
+    const positions = await getPositions(proxyWalletAddress);
     console.log(
       JSON.stringify(
         {
           ok: true,
-          walletAddress: session.walletAddress,
+          proxyWalletAddress,
           count: Array.isArray(positions) ? positions.length : 0,
           positions
         },
@@ -702,11 +703,9 @@ export const polymarketCommand: CommandModule = {
       })
       .command({
         command: 'positions',
-        describe: 'List open positions for the smart wallet',
-        builder: (y) =>
-          y.option('wallet', { type: 'string', default: 'main', describe: 'Wallet name' }),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        handler: (argv) => handlePositions(argv as any)
+        describe: 'List open positions for the Polymarket proxy wallet',
+        builder: (y) => y,
+        handler: () => handlePositions()
       })
       .command({
         command: 'orders',

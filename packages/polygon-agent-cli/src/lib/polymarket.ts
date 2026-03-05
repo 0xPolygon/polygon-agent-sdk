@@ -96,7 +96,7 @@ export async function executeViaProxyWallet(
     functionName: 'execute',
     args: [transactions]
   });
-  const hash = await walletClient.sendTransaction({ to: proxyWalletAddress, data, value: 0n });
+  const hash = await walletClient.sendTransaction({ to: PROXY_WALLET_FACTORY, data, value: 0n });
   await publicClient.waitForTransactionReceipt({ hash });
   return hash;
 }
