@@ -193,3 +193,27 @@ export async function deleteWallet(name: string): Promise<boolean> {
 
   return false;
 }
+
+export async function savePolymarketKey(privateKey: string): Promise<void> {
+  ensureStorageDir();
+  const configPath = path.join(STORAGE_DIR, 'builder.json');
+  let data: Record<string, unknown> = {};
+  if (fs.existsSync(configPath)) {
+    data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  }
+  data.polymarketPrivateKey = encrypt(privateKey);
+  fs.writeFileSync(configPath, JSON.stringify(data, null, 2), { mode: 0o600 });
+}
+
+export async function loadPolymarketKey(): Promise<string> {
+  const configPath = path.join(STORAGE_DIR, 'builder.json');
+  if (!fs.existsSync(configPath)) {
+    throw new Error('No builder config found. Run: polygon-agent setup');
+  }
+  const data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  if (data.polymarketPrivateKey) return decrypt(data.polymarketPrivateKey as CipherData);
+  if (data.privateKey) return decrypt(data.privateKey as CipherData);
+  throw new Error(
+    'No EOA key found. Run: polygon-agent setup or polygon-agent polymarket set-key <privateKey>'
+  );
+}
