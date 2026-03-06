@@ -278,9 +278,10 @@ export async function runDappClientTx({
   await client.initialize();
   if (!client.isInitialized) throw new Error('Client not initialized');
 
-  if (broadcast) {
+  if (broadcast && preferNativeFee) {
     // Detect counterfactual (undeployed) wallet early — the relayer cannot simulate
-    // meta-transactions against a contract that doesn't exist on-chain yet.
+    // native token transfers (via ValueForwarder) against a contract that doesn't exist yet.
+    // ERC20 sends work fine on counterfactual wallets (relayer bundles deploy+execute).
     try {
       const rpcUrl = nodesUrl.replace('{network}', 'polygon');
       const res = await fetch(rpcUrl, {
