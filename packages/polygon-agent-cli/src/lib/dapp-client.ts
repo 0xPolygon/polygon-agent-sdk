@@ -278,6 +278,35 @@ export async function runDappClientTx({
   await client.initialize();
   if (!client.isInitialized) throw new Error('Client not initialized');
 
+  if (broadcast) {
+    // Detect counterfactual (undeployed) wallet early — the relayer cannot simulate
+    // meta-transactions against a contract that doesn't exist on-chain yet.
+    try {
+      const rpcUrl = nodesUrl.replace('{network}', 'polygon');
+      const res = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_getCode',
+          params: [walletAddress, 'latest']
+        })
+      });
+      const json = (await res.json()) as { result?: string };
+      if (json.result === '0x' || json.result === '0x0') {
+        throw new Error(
+          `Smart wallet ${walletAddress} is not yet deployed on-chain. ` +
+            `Send USDC to the wallet address and use the 'send' command to make the first ERC20 transfer — ` +
+            `this will deploy the wallet contract via the Sequence relayer. Then retry send-native.`
+        );
+      }
+    } catch (e) {
+      if ((e as Error).message.includes('not yet deployed')) throw e;
+      // RPC check failed — proceed and let the relayer surface any error
+    }
+  }
+
   if (!broadcast) {
     const bigintReplacer = (_k: string, v: unknown) => (typeof v === 'bigint' ? v.toString() : v);
     console.log(
@@ -306,20 +335,8 @@ export async function runDappClientTx({
       if (debugFee) console.error(JSON.stringify({ debug: 'feeOptions', feeOptions }, null, 2));
       const nativeOpt = (feeOptions || []).find(isNativeFeeOption);
       if (nativeOpt) feeOpt = nativeOpt;
-    } catch (e) {
-      const msg = (e as Error)?.message || String(e);
-      const isSimulationFailure =
-        msg.includes('gas usage simulation failed') ||
-        msg.includes('Request aborted') ||
-        msg.includes('Aborted');
-      if (isSimulationFailure) {
-        throw new Error(
-          `Gas simulation failed — your smart wallet (${walletAddress}) may not be deployed on-chain yet. ` +
-            `Fund it with USDC (native) first, then retry. ` +
-            `Original error: ${msg}`
-        );
-      }
-      // Other errors: fall through to ERC20 fee path
+    } catch {
+      // Fall through to ERC20 fee path
     }
   }
 
@@ -403,19 +420,7 @@ export async function runDappClientTx({
       const feeOptions = await client.getFeeOptions(chainId, transactions as any);
       feeOpt = feeOptions?.[0];
     } catch (e) {
-      const msg = (e as Error)?.message || String(e);
-      const isSimulationFailure =
-        msg.includes('gas usage simulation failed') ||
-        msg.includes('Request aborted') ||
-        msg.includes('Aborted');
-      if (isSimulationFailure) {
-        throw new Error(
-          `Gas simulation failed — your smart wallet (${walletAddress}) may not be deployed on-chain yet. ` +
-            `Fund it with USDC (native) first, then retry. ` +
-            `Original error: ${msg}`
-        );
-      }
-      throw new Error(`Unable to determine fee option: ${msg}`);
+      throw new Error(`Unable to determine fee option: ${(e as Error)?.message}`);
     }
   }
 
