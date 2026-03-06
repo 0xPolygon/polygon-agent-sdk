@@ -46,6 +46,26 @@ function ensureStorageDir(): void {
   }
 }
 
+export function getStorageRoot(): string {
+  ensureStorageDir();
+  return STORAGE_DIR;
+}
+
+export function getStoragePath(...parts: string[]): string {
+  ensureStorageDir();
+  return path.join(STORAGE_DIR, ...parts);
+}
+
+export function ensureStorageSubdirs(subdirs: string[]): void {
+  ensureStorageDir();
+  for (const dir of subdirs) {
+    const fullPath = path.join(STORAGE_DIR, dir);
+    if (!fs.existsSync(fullPath)) {
+      fs.mkdirSync(fullPath, { recursive: true, mode: 0o700 });
+    }
+  }
+}
+
 function getEncryptionKey(): Buffer {
   ensureStorageDir();
 

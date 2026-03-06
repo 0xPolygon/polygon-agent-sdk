@@ -6,6 +6,14 @@ import { fileURLToPath } from 'node:url';
 
 import { Contract, Interface, JsonRpcProvider } from 'ethers';
 
+import {
+  cronAdd,
+  cronRunDue,
+  listJobs,
+  removeJob,
+  runCliJob,
+  runJobLoop
+} from '../lib/automation.ts';
 import { runDappClientTx } from '../lib/dapp-client.ts';
 import {
   resolveNetwork,
@@ -408,6 +416,102 @@ async function handleReviews(argv: {
   }
 }
 
+async function handleRun(argv: { job: string; policy?: string; wallet?: string }): Promise<void> {
+  try {
+    const result = await runCliJob({
+      job: argv.job as Parameters<typeof runCliJob>[0]['job'],
+      policyFile: argv.policy,
+      wallet: argv.wallet,
+      broadcast: false
+    });
+    console.log(JSON.stringify(result, null, 2));
+  } catch (error) {
+    console.error(JSON.stringify({ ok: false, error: (error as Error).message }, null, 2));
+    process.exit(1);
+  }
+}
+
+async function handleLoop(argv: {
+  job: string[];
+  policy?: string;
+  wallet?: string;
+  interval: number;
+  'max-runs'?: number;
+  lock?: string;
+  'state-dir'?: string;
+}): Promise<void> {
+  void argv['state-dir'];
+  try {
+    const events = await runJobLoop({
+      jobs: (argv.job || []) as Parameters<typeof runJobLoop>[0]['jobs'],
+      policyFile: argv.policy,
+      wallet: argv.wallet,
+      intervalSeconds: argv.interval,
+      maxRuns: argv['max-runs'],
+      lockFile: argv.lock
+    });
+    console.log(JSON.stringify({ ok: true, events }, null, 2));
+  } catch (error) {
+    console.error(JSON.stringify({ ok: false, error: (error as Error).message }, null, 2));
+    process.exit(1);
+  }
+}
+
+async function handleCronAdd(argv: {
+  name: string;
+  job: string;
+  policy?: string;
+  wallet?: string;
+  interval?: number;
+  'max-runs'?: number;
+}): Promise<void> {
+  try {
+    const job = cronAdd({
+      name: argv.name,
+      type: argv.job as Parameters<typeof cronAdd>[0]['type'],
+      policyFile: argv.policy,
+      wallet: argv.wallet,
+      intervalSeconds: argv.interval,
+      maxRuns: argv['max-runs'],
+      nextRunAt: new Date().toISOString()
+    });
+    console.log(JSON.stringify({ ok: true, job }, null, 2));
+  } catch (error) {
+    console.error(JSON.stringify({ ok: false, error: (error as Error).message }, null, 2));
+    process.exit(1);
+  }
+}
+
+async function handleCronList(): Promise<void> {
+  try {
+    console.log(JSON.stringify({ ok: true, jobs: listJobs() }, null, 2));
+  } catch (error) {
+    console.error(JSON.stringify({ ok: false, error: (error as Error).message }, null, 2));
+    process.exit(1);
+  }
+}
+
+async function handleCronRemove(argv: { name: string }): Promise<void> {
+  try {
+    const removed = removeJob(argv.name);
+    if (!removed) throw new Error(`Cron job not found: ${argv.name}`);
+    console.log(JSON.stringify({ ok: true, name: argv.name }, null, 2));
+  } catch (error) {
+    console.error(JSON.stringify({ ok: false, error: (error as Error).message }, null, 2));
+    process.exit(1);
+  }
+}
+
+async function handleCronRunDue(): Promise<void> {
+  try {
+    const results = await cronRunDue();
+    console.log(JSON.stringify({ ok: true, results }, null, 2));
+  } catch (error) {
+    console.error(JSON.stringify({ ok: false, error: (error as Error).message }, null, 2));
+    process.exit(1);
+  }
+}
+
 // --- Main agent command ---
 export const agentCommand: CommandModule = {
   command: 'agent',
@@ -579,6 +683,84 @@ export const agentCommand: CommandModule = {
             }),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         handler: (argv) => handleReviews(argv as any)
+      })
+      .command({
+        command: 'run',
+        describe: 'Run one CLI automation job once',
+        builder: (y) =>
+          y
+            .option('job', { type: 'string', demandOption: true, describe: 'Job type' })
+            .option('policy', { type: 'string', describe: 'Policy file path' })
+            .option('wallet', { type: 'string', describe: 'Wallet name override' }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        handler: (argv) => handleRun(argv as any)
+      })
+      .command({
+        command: 'loop',
+        describe: 'Run one or more CLI jobs on an interval',
+        builder: (y) =>
+          y
+            .option('job', {
+              type: 'string',
+              array: true,
+              demandOption: true,
+              describe: 'Job type, repeatable'
+            })
+            .option('policy', { type: 'string', describe: 'Policy file path' })
+            .option('wallet', { type: 'string', describe: 'Wallet name override' })
+            .option('interval', {
+              type: 'number',
+              demandOption: true,
+              describe: 'Loop interval in seconds'
+            })
+            .option('max-runs', { type: 'number', describe: 'Maximum iterations before stopping' })
+            .option('lock', { type: 'string', describe: 'Optional lockfile path' })
+            .option('state-dir', {
+              type: 'string',
+              describe: 'Reserved for future state path override'
+            }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        handler: (argv) => handleLoop(argv as any)
+      })
+      .command({
+        command: 'cron',
+        describe: 'Manage CLI-scoped recurring jobs',
+        builder: (y) =>
+          y
+            .command({
+              command: 'add',
+              describe: 'Add a recurring CLI job',
+              builder: (yy) =>
+                yy
+                  .option('name', { type: 'string', demandOption: true, describe: 'Job name' })
+                  .option('job', { type: 'string', demandOption: true, describe: 'Job type' })
+                  .option('policy', { type: 'string', describe: 'Policy file path' })
+                  .option('wallet', { type: 'string', describe: 'Wallet name override' })
+                  .option('interval', { type: 'number', describe: 'Interval in seconds' })
+                  .option('max-runs', { type: 'number', describe: 'Optional max run count' }),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              handler: (argv) => handleCronAdd(argv as any)
+            })
+            .command({
+              command: 'list',
+              describe: 'List recurring jobs',
+              handler: () => handleCronList()
+            })
+            .command({
+              command: 'remove',
+              describe: 'Remove recurring job',
+              builder: (yy) =>
+                yy.option('name', { type: 'string', demandOption: true, describe: 'Job name' }),
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              handler: (argv) => handleCronRemove(argv as any)
+            })
+            .command({
+              command: 'run-due',
+              describe: 'Run all due recurring jobs',
+              handler: () => handleCronRunDue()
+            })
+            .demandCommand(1, ''),
+        handler: () => {}
       })
       .demandCommand(1, '')
       .showHelpOnFail(true),

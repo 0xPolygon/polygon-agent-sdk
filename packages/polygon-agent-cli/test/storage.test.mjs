@@ -90,3 +90,18 @@ test('polymarket key helpers use the dedicated key when present and fall back to
   await storage.savePolymarketKey('0x' + '66'.repeat(32));
   assert.equal(await storage.loadPolymarketKey(), '0x' + '66'.repeat(32));
 });
+
+test('storage path helpers create nested subdirectories under ~/.polygon-agent', async () => {
+  const home = makeTempHome('storage-paths');
+  const storage = await loadStorageModule(home);
+
+  storage.ensureStorageSubdirs(['automation/jobs', 'performance']);
+
+  assert.ok(fs.existsSync(path.join(home, '.polygon-agent', 'automation', 'jobs')));
+  assert.ok(fs.existsSync(path.join(home, '.polygon-agent', 'performance')));
+  assert.equal(storage.getStorageRoot(), path.join(home, '.polygon-agent'));
+  assert.equal(
+    storage.getStoragePath('automation', 'jobs', 'scan.json'),
+    path.join(home, '.polygon-agent', 'automation', 'jobs', 'scan.json')
+  );
+});

@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
 import yargs from 'yargs';
@@ -344,6 +347,17 @@ test('agent commands function with mocked registry and tx boundaries', async (t)
     }
   });
 
+  t.mock.module(new URL('../src/lib/automation.ts', import.meta.url).href, {
+    namedExports: {
+      runCliJob: async ({ job }) => ({ ok: true, job }),
+      runJobLoop: async ({ jobs }) => jobs.map((job) => ({ ok: true, job })),
+      cronAdd: ({ name, type }) => ({ version: 1, name, type, enabled: true }),
+      listJobs: () => [{ version: 1, name: 'morning-scan', type: 'scan-markets', enabled: true }],
+      removeJob: () => true,
+      cronRunDue: async () => [{ ok: true, job: 'scan-markets' }]
+    }
+  });
+
   t.mock.module('ethers', {
     namedExports: {
       ...actualEthers,
@@ -408,6 +422,41 @@ test('agent commands function with mocked registry and tx boundaries', async (t)
 
   result = await parseCommand(agentCommand, ['agent', 'reviews', '--agent-id', '1']);
   assert.equal(JSON.parse(result.logs[0]).feedbackCount, 1);
+
+  result = await parseCommand(agentCommand, ['agent', 'run', '--job', 'scan-markets']);
+  assert.equal(JSON.parse(result.logs[0]).job, 'scan-markets');
+
+  result = await parseCommand(agentCommand, [
+    'agent',
+    'loop',
+    '--job',
+    'scan-markets',
+    '--interval',
+    '1',
+    '--max-runs',
+    '1'
+  ]);
+  assert.equal(JSON.parse(result.logs[0]).ok, true);
+
+  result = await parseCommand(agentCommand, [
+    'agent',
+    'cron',
+    'add',
+    '--name',
+    'morning-scan',
+    '--job',
+    'scan-markets'
+  ]);
+  assert.equal(JSON.parse(result.logs[0]).job.name, 'morning-scan');
+
+  result = await parseCommand(agentCommand, ['agent', 'cron', 'list']);
+  assert.equal(JSON.parse(result.logs[0]).jobs[0].name, 'morning-scan');
+
+  result = await parseCommand(agentCommand, ['agent', 'cron', 'remove', '--name', 'morning-scan']);
+  assert.equal(JSON.parse(result.logs[0]).name, 'morning-scan');
+
+  result = await parseCommand(agentCommand, ['agent', 'cron', 'run-due']);
+  assert.equal(JSON.parse(result.logs[0]).results[0].job, 'scan-markets');
 });
 
 test('polymarket commands function with mocked market and wallet integrations', async (t) => {
@@ -419,6 +468,8 @@ test('polymarket commands function with mocked market and wallet integrations', 
         chain: 'polygon',
         projectAccessKey: 'pk_wallet'
       }),
+      getStoragePath: (...parts) => `/tmp/${parts.join('/')}`,
+      ensureStorageSubdirs: () => {},
       savePolymarketKey: async () => {},
       loadPolymarketKey: async () => '0x' + '77'.repeat(32)
     }
@@ -457,6 +508,84 @@ test('polymarket commands function with mocked market and wallet integrations', 
       getPolymarketProxyWalletAddress: async () => '0x' + '88'.repeat(20),
       executeViaProxyWallet: async () => '0xapprovetx',
       getPositions: async () => [{ tokenId: 'yes-1', size: 10 }]
+    }
+  });
+
+  t.mock.module(new URL('../src/lib/policy.ts', import.meta.url).href, {
+    namedExports: {
+      loadPolicy: () => ({
+        name: 'test-policy',
+        wallet: 'main',
+        marketUniverse: {
+          search: null,
+          minVolume24hrUsd: 1000,
+          maxDaysToEnd: 14,
+          includeNegRisk: false
+        },
+        signalRules: {
+          minEdgeBps: 300,
+          minConfidenceScore: 0.6,
+          yesNoBias: 'auto',
+          requireOrderbookLiquidityUsd: 100
+        },
+        sizing: { method: 'fixed_fraction', perTradeFraction: 0.05, maxTradeUsd: 100 },
+        risk: {
+          reserveFloorUsd: 100,
+          maxDailyLossUsd: 50,
+          maxPerMarketExposureUsd: 100,
+          maxConcurrentPositions: 5,
+          maxOpenOrders: 10,
+          maxSlippageBps: 100,
+          stopOnSessionExpiryMinutes: 30
+        },
+        treasury: { targetProxyWalletUsd: 100, maxProxyWalletIdleUsd: 200 },
+        automation: { jobs: [] }
+      })
+    }
+  });
+
+  t.mock.module(new URL('../src/lib/polymarket-strategy.ts', import.meta.url).href, {
+    namedExports: {
+      scanMarkets: async () => ({
+        ok: true,
+        policy: 'test-policy',
+        eligible: [{ conditionId: 'cond-1', question: 'Will it rain?', volume24hrUsd: 10000 }],
+        rejected: []
+      }),
+      signalMarket: async () => ({
+        conditionId: 'cond-1',
+        question: 'Will it rain?',
+        recommendedSide: 'YES',
+        signalScore: 91,
+        confidence: 0.91,
+        priceReference: 0.45,
+        liquidityScore: 0.8,
+        volume24hrUsd: 10000,
+        rationale: ['good'],
+        rejected: false,
+        rejectionReasons: [],
+        treasuryCompatibility: { allowed: true, reasons: [] }
+      }),
+      buildTradePlan: async () => ({
+        version: 1,
+        planId: 'plan-1',
+        policyName: 'test-policy',
+        walletName: 'main',
+        generatedAt: '2026-03-06T00:00:00.000Z',
+        trades: [
+          {
+            planTradeId: 'pt-1',
+            conditionId: 'cond-1',
+            question: 'Will it rain?',
+            side: 'YES',
+            amountUsd: 25
+          }
+        ],
+        treasurySnapshot: { deployableUsd: 100 },
+        validation: []
+      }),
+      saveTradePlan: () => {},
+      executeTradePlan: async ({ broadcast }) => [{ ok: true, dryRun: !broadcast, tradeId: 'pt-1' }]
     }
   });
 
@@ -500,4 +629,155 @@ test('polymarket commands function with mocked market and wallet integrations', 
 
   result = await parseCommand(polymarketCommand, ['polymarket', 'cancel', 'order-1']);
   assert.equal(JSON.parse(result.logs[0]).orderId, 'order-1');
+
+  result = await parseCommand(polymarketCommand, [
+    'polymarket',
+    'scan',
+    '--policy',
+    '/tmp/policy.yaml'
+  ]);
+  assert.equal(JSON.parse(result.logs[0]).eligible[0].conditionId, 'cond-1');
+
+  result = await parseCommand(polymarketCommand, [
+    'polymarket',
+    'signal',
+    '--policy',
+    '/tmp/policy.yaml',
+    '--condition-id',
+    'cond-1'
+  ]);
+  assert.equal(JSON.parse(result.logs[0]).signals[0].recommendedSide, 'YES');
+
+  result = await parseCommand(polymarketCommand, [
+    'polymarket',
+    'plan',
+    '--policy',
+    '/tmp/policy.yaml',
+    '--condition-id',
+    'cond-1'
+  ]);
+  assert.equal(JSON.parse(result.logs[0]).plan.planId, 'plan-1');
+
+  const tempPlanPath = path.join(os.tmpdir(), `plan-${Date.now()}.json`);
+  fs.writeFileSync(
+    tempPlanPath,
+    JSON.stringify({
+      version: 1,
+      planId: 'plan-1',
+      walletName: 'main',
+      trades: [{ planTradeId: 'pt-1', conditionId: 'cond-1', side: 'YES', amountUsd: 25 }]
+    })
+  );
+  result = await parseCommand(polymarketCommand, [
+    'polymarket',
+    'execute-plan',
+    '--plan',
+    tempPlanPath
+  ]);
+  assert.equal(JSON.parse(result.logs[0]).results[0].ok, true);
+});
+
+test('treasury commands function with mocked treasury and performance integrations', async (t) => {
+  t.mock.module(new URL('../src/lib/policy.ts', import.meta.url).href, {
+    namedExports: {
+      loadPolicy: () => ({
+        name: 'test-policy',
+        wallet: 'main',
+        sizing: { perTradeFraction: 0.05, maxTradeUsd: 50 },
+        risk: {
+          reserveFloorUsd: 100,
+          maxDailyLossUsd: 50,
+          maxPerMarketExposureUsd: 100,
+          maxConcurrentPositions: 5,
+          maxOpenOrders: 10,
+          maxSlippageBps: 100,
+          stopOnSessionExpiryMinutes: 30
+        },
+        treasury: { targetProxyWalletUsd: 150, maxProxyWalletIdleUsd: 300 }
+      })
+    }
+  });
+
+  t.mock.module(new URL('../src/lib/treasury.ts', import.meta.url).href, {
+    namedExports: {
+      getTreasurySnapshot: async () => ({
+        walletAddress: '0x' + '11'.repeat(20),
+        smartWalletBalances: [{ type: 'erc20', symbol: 'USDC', balance: '500', usdValue: 500 }],
+        proxyWalletAddress: '0x' + '22'.repeat(20),
+        proxyWalletBalanceUsd: 200,
+        reservedUsd: 10,
+        deployableUsd: 250,
+        reserveFloorUsd: 100,
+        openExposureUsd: 25,
+        openOrdersUsd: 10,
+        realizedPnlUsd: 5,
+        unrealizedPnlUsd: 0,
+        valuationStatus: 'complete',
+        sessionHealth: {
+          hasSession: true,
+          expiresAt: null,
+          expiresInMinutes: null,
+          isExpiringSoon: false
+        }
+      }),
+      evaluateTreasuryLimits: () => [{ code: 'reserve-floor', ok: true, message: 'ok' }]
+    }
+  });
+
+  t.mock.module(new URL('../src/lib/performance.ts', import.meta.url).href, {
+    namedExports: {
+      summarizePnl: () => ({
+        realizedPnlUsd: 12,
+        feesUsd: 1,
+        winCount: 2,
+        lossCount: 1,
+        averageTradeUsd: 25,
+        byStrategy: { 'test-policy': 12 },
+        byMarket: { 'cond-1': 12 },
+        entries: []
+      })
+    }
+  });
+
+  const { treasuryCommand } = await importFresh(
+    '../src/commands/treasury.ts',
+    `treasury-${Math.random()}`
+  );
+
+  let result = await parseCommand(treasuryCommand, [
+    'treasury',
+    'status',
+    '--policy',
+    '/tmp/policy.yaml'
+  ]);
+  assert.equal(JSON.parse(result.logs[0]).snapshot.deployableUsd, 250);
+
+  result = await parseCommand(treasuryCommand, [
+    'treasury',
+    'allocate',
+    '--policy',
+    '/tmp/policy.yaml',
+    '--amount',
+    '25'
+  ]);
+  assert.equal(JSON.parse(result.logs[0]).approvedUsd, 25);
+
+  result = await parseCommand(treasuryCommand, [
+    'treasury',
+    'rebalance',
+    '--policy',
+    '/tmp/policy.yaml'
+  ]);
+  assert.equal(JSON.parse(result.logs[0]).dryRun, true);
+
+  result = await parseCommand(treasuryCommand, [
+    'treasury',
+    'limits',
+    '--policy',
+    '/tmp/policy.yaml'
+  ]);
+  assert.equal(JSON.parse(result.logs[0]).limits.maxOpenOrders, 10);
+
+  result = await parseCommand(treasuryCommand, ['treasury', 'pnl']);
+  assert.equal(JSON.parse(result.logs[0]).realizedPnlUsd, 12);
 });

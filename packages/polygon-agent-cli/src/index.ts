@@ -20,6 +20,7 @@ import {
 } from './commands/operations.ts';
 import { polymarketCommand } from './commands/polymarket.ts';
 import { setupCommand } from './commands/setup.ts';
+import { treasuryCommand } from './commands/treasury.ts';
 import { walletCommand } from './commands/wallet.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -91,6 +92,7 @@ const parser = yargs(hideBin(process.argv))
   .command(depositCommand)
   .command(x402PayCommand)
   .command(agentCommand)
+  .command(treasuryCommand)
   .command(polymarketCommand);
 
 // Register legacy aliases

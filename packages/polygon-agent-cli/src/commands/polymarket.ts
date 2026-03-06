@@ -6,7 +6,18 @@
 
 import type { CommandModule } from 'yargs';
 
+import fs from 'node:fs';
+import path from 'node:path';
+
 import { runDappClientTx } from '../lib/dapp-client.ts';
+import { loadPolicy } from '../lib/policy.ts';
+import {
+  buildTradePlan,
+  executeTradePlan,
+  saveTradePlan,
+  scanMarkets,
+  signalMarket
+} from '../lib/polymarket-strategy.ts';
 import {
   getMarkets,
   getMarket,
@@ -23,7 +34,13 @@ import {
   NEG_RISK_CTF_EXCHANGE,
   NEG_RISK_ADAPTER
 } from '../lib/polymarket.ts';
-import { loadWalletSession, savePolymarketKey, loadPolymarketKey } from '../lib/storage.ts';
+import {
+  getStoragePath,
+  ensureStorageSubdirs,
+  loadWalletSession,
+  savePolymarketKey,
+  loadPolymarketKey
+} from '../lib/storage.ts';
 
 // ─── handlers ────────────────────────────────────────────────────────────────
 
@@ -579,6 +596,170 @@ async function handleCancel(argv: { orderId: string }): Promise<void> {
   }
 }
 
+async function handleScan(argv: {
+  policy: string;
+  search?: string;
+  limit?: number;
+  'min-volume'?: number;
+  'max-days-to-end'?: number;
+  'include-neg-risk'?: boolean;
+  format?: string;
+}): Promise<void> {
+  try {
+    const policy = loadPolicy(argv.policy);
+    const result = await scanMarkets({
+      policy,
+      search: argv.search,
+      limit: argv.limit,
+      minVolume: argv['min-volume'],
+      maxDaysToEnd: argv['max-days-to-end'],
+      includeNegRisk: argv['include-neg-risk']
+    });
+    console.log(
+      JSON.stringify(
+        {
+          ...result,
+          format: argv.format || 'full',
+          eligible:
+            argv.format === 'summary'
+              ? result.eligible.map((item) => ({
+                  conditionId: item.conditionId,
+                  question: item.question,
+                  volume24hrUsd: item.volume24hrUsd
+                }))
+              : result.eligible
+        },
+        null,
+        2
+      )
+    );
+  } catch (err) {
+    console.error(JSON.stringify({ ok: false, error: (err as Error).message }, null, 2));
+    process.exit(1);
+  }
+}
+
+async function handleSignal(argv: {
+  policy: string;
+  'condition-id'?: string;
+  'from-scan'?: string;
+  side?: string;
+  wallet?: string;
+}): Promise<void> {
+  try {
+    const policy = loadPolicy(argv.policy);
+    const walletName = argv.wallet || policy.wallet;
+    let conditionIds: string[] = [];
+    if (argv['condition-id']) conditionIds = [argv['condition-id']];
+    if (argv['from-scan']) {
+      const parsed = JSON.parse(fs.readFileSync(argv['from-scan'], 'utf8'));
+      conditionIds = [
+        ...conditionIds,
+        ...(parsed.eligible || []).map((item: { conditionId: string }) => item.conditionId)
+      ];
+    }
+    if (!conditionIds.length) throw new Error('Provide --condition-id or --from-scan');
+    const signals = await Promise.all(
+      conditionIds.map((conditionId) =>
+        signalMarket({
+          policy,
+          conditionId,
+          side: (argv.side || 'AUTO').toUpperCase() as 'YES' | 'NO' | 'AUTO',
+          walletName
+        })
+      )
+    );
+    console.log(JSON.stringify({ ok: true, policy: policy.name, signals }, null, 2));
+  } catch (err) {
+    console.error(JSON.stringify({ ok: false, error: (err as Error).message }, null, 2));
+    process.exit(1);
+  }
+}
+
+async function handlePlan(argv: {
+  policy: string;
+  wallet?: string;
+  'condition-id'?: string;
+  'from-scan'?: string;
+  'from-signal'?: string;
+  'max-trades'?: number;
+  output?: string;
+}): Promise<void> {
+  try {
+    const policy = loadPolicy(argv.policy);
+    const walletName = argv.wallet || policy.wallet;
+    let signals = [];
+    if (argv['from-signal']) {
+      const parsed = JSON.parse(fs.readFileSync(argv['from-signal'], 'utf8'));
+      signals = parsed.signals || [];
+    } else {
+      let conditionIds: string[] = [];
+      if (argv['condition-id']) conditionIds = [argv['condition-id']];
+      if (argv['from-scan']) {
+        const parsed = JSON.parse(fs.readFileSync(argv['from-scan'], 'utf8'));
+        conditionIds = [
+          ...conditionIds,
+          ...(parsed.eligible || []).map((item: { conditionId: string }) => item.conditionId)
+        ];
+      }
+      if (!conditionIds.length)
+        throw new Error('Provide --condition-id, --from-scan, or --from-signal');
+      signals = await Promise.all(
+        conditionIds.map((conditionId) => signalMarket({ policy, conditionId, walletName }))
+      );
+    }
+    const plan = await buildTradePlan({
+      policy,
+      walletName,
+      signals,
+      maxTrades: argv['max-trades']
+    });
+    ensureStorageSubdirs(['plans']);
+    const outputPath =
+      argv.output ||
+      getStoragePath(
+        'plans',
+        `${new Date().toISOString().replace(/[:.]/g, '-')}-${plan.planId}.json`
+      );
+    saveTradePlan(plan, outputPath);
+    console.log(JSON.stringify({ ok: true, dryRun: true, outputPath, plan }, null, 2));
+  } catch (err) {
+    console.error(JSON.stringify({ ok: false, error: (err as Error).message }, null, 2));
+    process.exit(1);
+  }
+}
+
+async function handleExecutePlan(argv: {
+  plan: string;
+  wallet?: string;
+  broadcast?: boolean;
+  'allow-partial'?: boolean;
+}): Promise<void> {
+  try {
+    const plan = JSON.parse(fs.readFileSync(path.resolve(argv.plan), 'utf8'));
+    const results = await executeTradePlan({
+      plan,
+      allowPartial: argv['allow-partial'] ?? false,
+      broadcast: argv.broadcast ?? false
+    });
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          dryRun: !(argv.broadcast ?? false),
+          planId: plan.planId,
+          results
+        },
+        null,
+        2
+      )
+    );
+  } catch (err) {
+    console.error(JSON.stringify({ ok: false, error: (err as Error).message }, null, 2));
+    process.exit(1);
+  }
+}
+
 // ─── Command module ───────────────────────────────────────────────────────────
 
 export const polymarketCommand: CommandModule = {
@@ -712,6 +893,69 @@ export const polymarketCommand: CommandModule = {
         describe: 'List open CLOB orders for the active EOA',
         builder: (y) => y,
         handler: () => handleOrders()
+      })
+      .command({
+        command: 'scan',
+        describe: 'Scan Polymarket markets using a reusable policy',
+        builder: (y) =>
+          y
+            .option('policy', { type: 'string', demandOption: true, describe: 'Policy file path' })
+            .option('search', { type: 'string', describe: 'Search filter' })
+            .option('limit', { type: 'number', default: 20, describe: 'Result limit' })
+            .option('min-volume', { type: 'number', describe: 'Override minimum 24h volume' })
+            .option('max-days-to-end', { type: 'number', describe: 'Override max days to expiry' })
+            .option('include-neg-risk', { type: 'boolean', describe: 'Include neg-risk markets' })
+            .option('format', { type: 'string', default: 'full', describe: 'summary or full' }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        handler: (argv) => handleScan(argv as any)
+      })
+      .command({
+        command: 'signal',
+        describe: 'Generate rule-based signals for one or more markets',
+        builder: (y) =>
+          y
+            .option('policy', { type: 'string', demandOption: true, describe: 'Policy file path' })
+            .option('condition-id', { type: 'string', describe: 'Specific market conditionId' })
+            .option('from-scan', { type: 'string', describe: 'Scan output file' })
+            .option('side', { type: 'string', default: 'AUTO', describe: 'YES, NO, or AUTO' })
+            .option('wallet', { type: 'string', describe: 'Wallet name override' }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        handler: (argv) => handleSignal(argv as any)
+      })
+      .command({
+        command: 'plan',
+        describe: 'Build a trade plan from signals and treasury constraints',
+        builder: (y) =>
+          y
+            .option('policy', { type: 'string', demandOption: true, describe: 'Policy file path' })
+            .option('wallet', { type: 'string', describe: 'Wallet name override' })
+            .option('condition-id', { type: 'string', describe: 'Specific market conditionId' })
+            .option('from-scan', { type: 'string', describe: 'Scan output file' })
+            .option('from-signal', { type: 'string', describe: 'Signal output file' })
+            .option('max-trades', { type: 'number', describe: 'Maximum trades to include' })
+            .option('output', { type: 'string', describe: 'Optional output path for plan JSON' }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        handler: (argv) => handlePlan(argv as any)
+      })
+      .command({
+        command: 'execute-plan',
+        describe: 'Execute a generated trade plan',
+        builder: (y) =>
+          y
+            .option('plan', { type: 'string', demandOption: true, describe: 'Plan JSON path' })
+            .option('wallet', { type: 'string', describe: 'Wallet name override' })
+            .option('allow-partial', {
+              type: 'boolean',
+              default: false,
+              describe: 'Continue after a trade failure'
+            })
+            .option('broadcast', {
+              type: 'boolean',
+              default: false,
+              describe: 'Execute live trades'
+            }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        handler: (argv) => handleExecutePlan(argv as any)
       })
       .command({
         command: 'cancel <orderId>',
