@@ -278,6 +278,36 @@ export async function runDappClientTx({
   await client.initialize();
   if (!client.isInitialized) throw new Error('Client not initialized');
 
+  if (broadcast && preferNativeFee) {
+    // Detect counterfactual (undeployed) wallet early — the relayer cannot simulate
+    // native token transfers (via ValueForwarder) against a contract that doesn't exist yet.
+    // ERC20 sends work fine on counterfactual wallets (relayer bundles deploy+execute).
+    try {
+      const rpcUrl = nodesUrl.replace('{network}', 'polygon');
+      const res = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_getCode',
+          params: [walletAddress, 'latest']
+        })
+      });
+      const json = (await res.json()) as { result?: string };
+      if (json.result === '0x' || json.result === '0x0') {
+        throw new Error(
+          `Smart wallet ${walletAddress} is not yet deployed on-chain. ` +
+            `Send USDC to the wallet address and use the 'send' command to make the first ERC20 transfer — ` +
+            `this will deploy the wallet contract via the Sequence relayer. Then retry send-native.`
+        );
+      }
+    } catch (e) {
+      if ((e as Error).message.includes('not yet deployed')) throw e;
+      // RPC check failed — proceed and let the relayer surface any error
+    }
+  }
+
   if (!broadcast) {
     const bigintReplacer = (_k: string, v: unknown) => (typeof v === 'bigint' ? v.toString() : v);
     console.log(
