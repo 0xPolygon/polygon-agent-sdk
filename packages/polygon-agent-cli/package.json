@@ -20,7 +20,8 @@
     "build": "tsc -p tsconfig.build.json",
     "prepublishOnly": "pnpm run build",
     "dev": "node src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-test-module-mocks --test test/**/*.test.mjs"
   },
   "dependencies": {
     "@0xsequence/abi": "3.0.0-beta.16",
