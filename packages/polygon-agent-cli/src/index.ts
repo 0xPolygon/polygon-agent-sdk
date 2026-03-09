@@ -18,6 +18,7 @@ import {
   swapCommand,
   x402PayCommand
 } from './commands/operations.ts';
+import { planCommand } from './commands/plan.ts';
 import { polymarketCommand } from './commands/polymarket.ts';
 import { setupCommand } from './commands/setup.ts';
 import { treasuryCommand } from './commands/treasury.ts';
@@ -92,6 +93,7 @@ const parser = yargs(hideBin(process.argv))
   .command(depositCommand)
   .command(x402PayCommand)
   .command(agentCommand)
+  .command(planCommand)
   .command(treasuryCommand)
   .command(polymarketCommand);
 

@@ -48,8 +48,8 @@ test('loadPolicy supports basic YAML policy files', async () => {
       '  minConfidenceScore: 0.7',
       'automation:',
       '  jobs:',
-      '    - name: morning-scan',
-      '      type: scan-markets',
+      '    - name: morning-status',
+      '      type: treasury-status',
       '      intervalSeconds: 1800'
     ].join('\n')
   );
@@ -58,5 +58,5 @@ test('loadPolicy supports basic YAML policy files', async () => {
   assert.equal(loaded.name, 'yaml-policy');
   assert.equal(loaded.marketUniverse.minVolume24hrUsd, 100000);
   assert.equal(loaded.signalRules.minConfidenceScore, 0.7);
-  assert.equal(loaded.automation.jobs[0].name, 'morning-scan');
+  assert.equal(loaded.automation.jobs[0].name, 'morning-status');
 });

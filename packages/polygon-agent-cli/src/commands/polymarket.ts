@@ -7,17 +7,10 @@
 import type { CommandModule } from 'yargs';
 
 import fs from 'node:fs';
-import path from 'node:path';
 
 import { runDappClientTx } from '../lib/dapp-client.ts';
 import { loadPolicy } from '../lib/policy.ts';
-import {
-  buildTradePlan,
-  executeTradePlan,
-  saveTradePlan,
-  scanMarkets,
-  signalMarket
-} from '../lib/polymarket-strategy.ts';
+import { scanMarkets, signalMarket } from '../lib/polymarket-strategy.ts';
 import {
   getMarkets,
   getMarket,
@@ -34,13 +27,7 @@ import {
   NEG_RISK_CTF_EXCHANGE,
   NEG_RISK_ADAPTER
 } from '../lib/polymarket.ts';
-import {
-  getStoragePath,
-  ensureStorageSubdirs,
-  loadWalletSession,
-  savePolymarketKey,
-  loadPolymarketKey
-} from '../lib/storage.ts';
+import { loadWalletSession, savePolymarketKey, loadPolymarketKey } from '../lib/storage.ts';
 
 // ─── handlers ────────────────────────────────────────────────────────────────
 
@@ -676,88 +663,36 @@ async function handleSignal(argv: {
   }
 }
 
-async function handlePlan(argv: {
-  policy: string;
-  wallet?: string;
-  'condition-id'?: string;
-  'from-scan'?: string;
-  'from-signal'?: string;
-  'max-trades'?: number;
-  output?: string;
-}): Promise<void> {
-  try {
-    const policy = loadPolicy(argv.policy);
-    const walletName = argv.wallet || policy.wallet;
-    let signals = [];
-    if (argv['from-signal']) {
-      const parsed = JSON.parse(fs.readFileSync(argv['from-signal'], 'utf8'));
-      signals = parsed.signals || [];
-    } else {
-      let conditionIds: string[] = [];
-      if (argv['condition-id']) conditionIds = [argv['condition-id']];
-      if (argv['from-scan']) {
-        const parsed = JSON.parse(fs.readFileSync(argv['from-scan'], 'utf8'));
-        conditionIds = [
-          ...conditionIds,
-          ...(parsed.eligible || []).map((item: { conditionId: string }) => item.conditionId)
-        ];
-      }
-      if (!conditionIds.length)
-        throw new Error('Provide --condition-id, --from-scan, or --from-signal');
-      signals = await Promise.all(
-        conditionIds.map((conditionId) => signalMarket({ policy, conditionId, walletName }))
-      );
-    }
-    const plan = await buildTradePlan({
-      policy,
-      walletName,
-      signals,
-      maxTrades: argv['max-trades']
-    });
-    ensureStorageSubdirs(['plans']);
-    const outputPath =
-      argv.output ||
-      getStoragePath(
-        'plans',
-        `${new Date().toISOString().replace(/[:.]/g, '-')}-${plan.planId}.json`
-      );
-    saveTradePlan(plan, outputPath);
-    console.log(JSON.stringify({ ok: true, dryRun: true, outputPath, plan }, null, 2));
-  } catch (err) {
-    console.error(JSON.stringify({ ok: false, error: (err as Error).message }, null, 2));
-    process.exit(1);
-  }
+async function handlePlan(argv: { policy?: string }): Promise<void> {
+  void argv.policy;
+  console.log(
+    JSON.stringify(
+      {
+        ok: false,
+        error:
+          'polymarket plan is deprecated. LLM should author a BettingPlan JSON, then use: polygon-agent plan validate/explain/execute.'
+      },
+      null,
+      2
+    )
+  );
+  process.exit(1);
 }
 
-async function handleExecutePlan(argv: {
-  plan: string;
-  wallet?: string;
-  broadcast?: boolean;
-  'allow-partial'?: boolean;
-}): Promise<void> {
-  try {
-    const plan = JSON.parse(fs.readFileSync(path.resolve(argv.plan), 'utf8'));
-    const results = await executeTradePlan({
-      plan,
-      allowPartial: argv['allow-partial'] ?? false,
-      broadcast: argv.broadcast ?? false
-    });
-    console.log(
-      JSON.stringify(
-        {
-          ok: true,
-          dryRun: !(argv.broadcast ?? false),
-          planId: plan.planId,
-          results
-        },
-        null,
-        2
-      )
-    );
-  } catch (err) {
-    console.error(JSON.stringify({ ok: false, error: (err as Error).message }, null, 2));
-    process.exit(1);
-  }
+async function handleExecutePlan(argv: { plan?: string }): Promise<void> {
+  void argv.plan;
+  console.log(
+    JSON.stringify(
+      {
+        ok: false,
+        error:
+          'polymarket execute-plan is deprecated. Use: polygon-agent plan execute --plan <file>.'
+      },
+      null,
+      2
+    )
+  );
+  process.exit(1);
 }
 
 // ─── Command module ───────────────────────────────────────────────────────────
@@ -896,7 +831,7 @@ export const polymarketCommand: CommandModule = {
       })
       .command({
         command: 'scan',
-        describe: 'Scan Polymarket markets using a reusable policy',
+        describe: 'Research aid: scan candidate Polymarket markets',
         builder: (y) =>
           y
             .option('policy', { type: 'string', demandOption: true, describe: 'Policy file path' })
@@ -911,7 +846,7 @@ export const polymarketCommand: CommandModule = {
       })
       .command({
         command: 'signal',
-        describe: 'Generate rule-based signals for one or more markets',
+        describe: 'Research aid: generate deterministic market signals',
         builder: (y) =>
           y
             .option('policy', { type: 'string', demandOption: true, describe: 'Policy file path' })
@@ -924,36 +859,15 @@ export const polymarketCommand: CommandModule = {
       })
       .command({
         command: 'plan',
-        describe: 'Build a trade plan from signals and treasury constraints',
-        builder: (y) =>
-          y
-            .option('policy', { type: 'string', demandOption: true, describe: 'Policy file path' })
-            .option('wallet', { type: 'string', describe: 'Wallet name override' })
-            .option('condition-id', { type: 'string', describe: 'Specific market conditionId' })
-            .option('from-scan', { type: 'string', describe: 'Scan output file' })
-            .option('from-signal', { type: 'string', describe: 'Signal output file' })
-            .option('max-trades', { type: 'number', describe: 'Maximum trades to include' })
-            .option('output', { type: 'string', describe: 'Optional output path for plan JSON' }),
+        describe: 'Deprecated alias (use top-level `plan` command)',
+        builder: (y) => y.option('policy', { type: 'string', describe: 'Deprecated option' }),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         handler: (argv) => handlePlan(argv as any)
       })
       .command({
         command: 'execute-plan',
-        describe: 'Execute a generated trade plan',
-        builder: (y) =>
-          y
-            .option('plan', { type: 'string', demandOption: true, describe: 'Plan JSON path' })
-            .option('wallet', { type: 'string', describe: 'Wallet name override' })
-            .option('allow-partial', {
-              type: 'boolean',
-              default: false,
-              describe: 'Continue after a trade failure'
-            })
-            .option('broadcast', {
-              type: 'boolean',
-              default: false,
-              describe: 'Execute live trades'
-            }),
+        describe: 'Deprecated alias (use `plan execute`)',
+        builder: (y) => y.option('plan', { type: 'string', describe: 'Deprecated option' }),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         handler: (argv) => handleExecutePlan(argv as any)
       })

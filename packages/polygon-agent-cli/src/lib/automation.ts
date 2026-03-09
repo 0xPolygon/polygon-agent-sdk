@@ -4,7 +4,6 @@ import path from 'node:path';
 import type { CliJobSpec } from './policy.ts';
 
 import { loadPolicy, normalizeJobSpec } from './policy.ts';
-import { buildTradePlan, scanMarkets, signalMarket } from './polymarket-strategy.ts';
 import { ensureStorageSubdirs, getStoragePath } from './storage.ts';
 import { getTreasurySnapshot } from './treasury.ts';
 
@@ -61,26 +60,6 @@ export async function runCliJob({
 
   let result: unknown;
   switch (job) {
-    case 'scan-markets':
-      if (!policy) throw new Error('scan-markets requires --policy');
-      result = await scanMarkets({ policy, limit: 20 });
-      break;
-    case 'signal-markets':
-      if (!policy) throw new Error('signal-markets requires --policy');
-      result = await scanMarkets({ policy, limit: 20 });
-      break;
-    case 'plan-trades':
-      if (!policy) throw new Error('plan-trades requires --policy');
-      {
-        const scan = await scanMarkets({ policy, limit: 20 });
-        const signals = await Promise.all(
-          scan.eligible
-            .slice(0, 5)
-            .map((market) => signalMarket({ policy, conditionId: market.conditionId, walletName }))
-        );
-        result = await buildTradePlan({ policy, walletName, signals });
-      }
-      break;
     case 'execute-plan':
       throw new Error('execute-plan requires a plan file and is not supported via generic run job');
     case 'treasury-status':
@@ -106,6 +85,8 @@ export async function runCliJob({
         };
       }
       break;
+    default:
+      throw new Error(`Unsupported CLI job: ${job}`);
   }
 
   const report = {

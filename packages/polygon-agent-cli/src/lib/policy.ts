@@ -7,9 +7,6 @@ import { randomHex } from './utils.ts';
 export type StrategySide = 'YES' | 'NO' | 'SKIP';
 export type BiasMode = 'yes' | 'no' | 'auto';
 export type CliJobType =
-  | 'scan-markets'
-  | 'signal-markets'
-  | 'plan-trades'
   | 'execute-plan'
   | 'treasury-status'
   | 'treasury-rebalance'
@@ -140,6 +137,70 @@ export interface TradePlan {
   trades: PlannedTrade[];
   treasurySnapshot: TreasurySnapshot;
   validation: ValidationResult[];
+}
+
+export type BettingPlanStepType =
+  | 'assert'
+  | 'read'
+  | 'fund_proxy'
+  | 'place_order'
+  | 'cancel_order'
+  | 'rebalance'
+  | 'checkpoint';
+
+export interface BettingPlanStep {
+  id: string;
+  type: BettingPlanStepType;
+  description?: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface BettingPlan {
+  version: 1;
+  planId: string;
+  wallet: string;
+  objective: string;
+  constraints?: {
+    reserveFloorUsd?: number;
+    maxOpenOrders?: number;
+    maxPerMarketExposureUsd?: number;
+    maxDailyLossUsd?: number;
+  };
+  steps: BettingPlanStep[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface PlanValidationResult {
+  ok: boolean;
+  planId: string;
+  checks: ValidationResult[];
+  blockingErrors: string[];
+  warnings: string[];
+}
+
+export interface PlanStepResult {
+  stepId: string;
+  type: BettingPlanStepType;
+  ok: boolean;
+  dryRun: boolean;
+  stopped?: boolean;
+  skipped?: boolean;
+  output?: unknown;
+  error?: string;
+}
+
+export interface PlanExecutionResult {
+  ok: boolean;
+  planId: string;
+  dryRun: boolean;
+  stoppedAtStep?: string;
+  stepResults: PlanStepResult[];
+  summary: {
+    totalSteps: number;
+    succeeded: number;
+    failed: number;
+    skipped: number;
+  };
 }
 
 const DEFAULT_POLICY: StrategyPolicy = {

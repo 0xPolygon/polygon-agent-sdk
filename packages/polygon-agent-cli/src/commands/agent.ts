@@ -37,6 +37,14 @@ const REPUTATION_ABI = JSON.parse(
   fs.readFileSync(path.join(contractsDir, 'ReputationRegistry.json'), 'utf8')
 );
 
+const AUTOMATION_JOB_TYPES = [
+  'execute-plan',
+  'treasury-status',
+  'treasury-rebalance',
+  'session-health',
+  'session-refresh-check'
+] as const;
+
 // --- register ---
 async function handleRegister(argv: {
   wallet: string;
@@ -689,7 +697,12 @@ export const agentCommand: CommandModule = {
         describe: 'Run one CLI automation job once',
         builder: (y) =>
           y
-            .option('job', { type: 'string', demandOption: true, describe: 'Job type' })
+            .option('job', {
+              type: 'string',
+              choices: [...AUTOMATION_JOB_TYPES],
+              demandOption: true,
+              describe: 'Job type'
+            })
             .option('policy', { type: 'string', describe: 'Policy file path' })
             .option('wallet', { type: 'string', describe: 'Wallet name override' }),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -703,6 +716,7 @@ export const agentCommand: CommandModule = {
             .option('job', {
               type: 'string',
               array: true,
+              choices: [...AUTOMATION_JOB_TYPES],
               demandOption: true,
               describe: 'Job type, repeatable'
             })
@@ -733,7 +747,12 @@ export const agentCommand: CommandModule = {
               builder: (yy) =>
                 yy
                   .option('name', { type: 'string', demandOption: true, describe: 'Job name' })
-                  .option('job', { type: 'string', demandOption: true, describe: 'Job type' })
+                  .option('job', {
+                    type: 'string',
+                    choices: [...AUTOMATION_JOB_TYPES],
+                    demandOption: true,
+                    describe: 'Job type'
+                  })
                   .option('policy', { type: 'string', describe: 'Policy file path' })
                   .option('wallet', { type: 'string', describe: 'Wallet name override' })
                   .option('interval', { type: 'number', describe: 'Interval in seconds' })

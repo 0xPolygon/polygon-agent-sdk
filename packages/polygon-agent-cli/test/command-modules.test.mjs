@@ -352,9 +352,11 @@ test('agent commands function with mocked registry and tx boundaries', async (t)
       runCliJob: async ({ job }) => ({ ok: true, job }),
       runJobLoop: async ({ jobs }) => jobs.map((job) => ({ ok: true, job })),
       cronAdd: ({ name, type }) => ({ version: 1, name, type, enabled: true }),
-      listJobs: () => [{ version: 1, name: 'morning-scan', type: 'scan-markets', enabled: true }],
+      listJobs: () => [
+        { version: 1, name: 'morning-status', type: 'treasury-status', enabled: true }
+      ],
       removeJob: () => true,
-      cronRunDue: async () => [{ ok: true, job: 'scan-markets' }]
+      cronRunDue: async () => [{ ok: true, job: 'treasury-status' }]
     }
   });
 
@@ -423,14 +425,14 @@ test('agent commands function with mocked registry and tx boundaries', async (t)
   result = await parseCommand(agentCommand, ['agent', 'reviews', '--agent-id', '1']);
   assert.equal(JSON.parse(result.logs[0]).feedbackCount, 1);
 
-  result = await parseCommand(agentCommand, ['agent', 'run', '--job', 'scan-markets']);
-  assert.equal(JSON.parse(result.logs[0]).job, 'scan-markets');
+  result = await parseCommand(agentCommand, ['agent', 'run', '--job', 'treasury-status']);
+  assert.equal(JSON.parse(result.logs[0]).job, 'treasury-status');
 
   result = await parseCommand(agentCommand, [
     'agent',
     'loop',
     '--job',
-    'scan-markets',
+    'treasury-status',
     '--interval',
     '1',
     '--max-runs',
@@ -443,20 +445,26 @@ test('agent commands function with mocked registry and tx boundaries', async (t)
     'cron',
     'add',
     '--name',
-    'morning-scan',
+    'morning-status',
     '--job',
-    'scan-markets'
+    'treasury-status'
   ]);
-  assert.equal(JSON.parse(result.logs[0]).job.name, 'morning-scan');
+  assert.equal(JSON.parse(result.logs[0]).job.name, 'morning-status');
 
   result = await parseCommand(agentCommand, ['agent', 'cron', 'list']);
-  assert.equal(JSON.parse(result.logs[0]).jobs[0].name, 'morning-scan');
+  assert.equal(JSON.parse(result.logs[0]).jobs[0].name, 'morning-status');
 
-  result = await parseCommand(agentCommand, ['agent', 'cron', 'remove', '--name', 'morning-scan']);
-  assert.equal(JSON.parse(result.logs[0]).name, 'morning-scan');
+  result = await parseCommand(agentCommand, [
+    'agent',
+    'cron',
+    'remove',
+    '--name',
+    'morning-status'
+  ]);
+  assert.equal(JSON.parse(result.logs[0]).name, 'morning-status');
 
   result = await parseCommand(agentCommand, ['agent', 'cron', 'run-due']);
-  assert.equal(JSON.parse(result.logs[0]).results[0].job, 'scan-markets');
+  assert.equal(JSON.parse(result.logs[0]).results[0].job, 'treasury-status');
 });
 
 test('polymarket commands function with mocked market and wallet integrations', async (t) => {
@@ -648,33 +656,60 @@ test('polymarket commands function with mocked market and wallet integrations', 
   ]);
   assert.equal(JSON.parse(result.logs[0]).signals[0].recommendedSide, 'YES');
 
-  result = await parseCommand(polymarketCommand, [
-    'polymarket',
-    'plan',
-    '--policy',
-    '/tmp/policy.yaml',
-    '--condition-id',
-    'cond-1'
-  ]);
-  assert.equal(JSON.parse(result.logs[0]).plan.planId, 'plan-1');
+  assert.equal(result.logs.length > 0, true);
+});
 
-  const tempPlanPath = path.join(os.tmpdir(), `plan-${Date.now()}.json`);
+test('plan commands validate/explain/execute with mocked plan engine', async (t) => {
+  const tempPlanPath = path.join(os.tmpdir(), `betting-plan-${Date.now()}.json`);
   fs.writeFileSync(
     tempPlanPath,
     JSON.stringify({
       version: 1,
-      planId: 'plan-1',
-      walletName: 'main',
-      trades: [{ planTradeId: 'pt-1', conditionId: 'cond-1', side: 'YES', amountUsd: 25 }]
+      planId: 'llm-plan-1',
+      wallet: 'main',
+      objective: 'Test objective',
+      constraints: { reserveFloorUsd: 25 },
+      steps: [{ id: 's1', type: 'checkpoint', payload: {} }]
     })
   );
-  result = await parseCommand(polymarketCommand, [
-    'polymarket',
-    'execute-plan',
-    '--plan',
-    tempPlanPath
-  ]);
-  assert.equal(JSON.parse(result.logs[0]).results[0].ok, true);
+
+  t.mock.module(new URL('../src/lib/betting-plan.ts', import.meta.url).href, {
+    namedExports: {
+      loadBettingPlan: (planPath) => JSON.parse(fs.readFileSync(planPath, 'utf8')),
+      validateBettingPlan: async () => ({
+        ok: true,
+        planId: 'llm-plan-1',
+        checks: [{ code: 'session-health', ok: true, message: 'ok' }],
+        blockingErrors: [],
+        warnings: []
+      }),
+      explainBettingPlan: () => ({
+        planId: 'llm-plan-1',
+        objective: 'Test objective',
+        wallet: 'main',
+        stepCount: 1,
+        steps: [{ stepId: 's1', type: 'checkpoint', dependsOn: [] }]
+      }),
+      executeBettingPlan: async ({ broadcast }) => ({
+        ok: true,
+        planId: 'llm-plan-1',
+        dryRun: !broadcast,
+        stepResults: [{ stepId: 's1', type: 'checkpoint', ok: true, dryRun: !broadcast }],
+        summary: { totalSteps: 1, succeeded: 1, failed: 0, skipped: 0 }
+      })
+    }
+  });
+
+  const { planCommand } = await importFresh('../src/commands/plan.ts', `plan-${Math.random()}`);
+
+  let result = await parseCommand(planCommand, ['plan', 'validate', '--plan', tempPlanPath]);
+  assert.equal(JSON.parse(result.logs[0]).ok, true);
+
+  result = await parseCommand(planCommand, ['plan', 'explain', '--plan', tempPlanPath]);
+  assert.equal(JSON.parse(result.logs[0]).stepCount, 1);
+
+  result = await parseCommand(planCommand, ['plan', 'execute', '--plan', tempPlanPath]);
+  assert.equal(JSON.parse(result.logs[0]).dryRun, true);
 });
 
 test('treasury commands function with mocked treasury and performance integrations', async (t) => {
