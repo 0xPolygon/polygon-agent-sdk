@@ -278,36 +278,6 @@ export async function runDappClientTx({
   await client.initialize();
   if (!client.isInitialized) throw new Error('Client not initialized');
 
-  if (broadcast && preferNativeFee) {
-    // Detect counterfactual (undeployed) wallet early — the relayer cannot simulate
-    // native token transfers (via ValueForwarder) against a contract that doesn't exist yet.
-    // ERC20 sends work fine on counterfactual wallets (relayer bundles deploy+execute).
-    try {
-      const rpcUrl = nodesUrl.replace('{network}', 'polygon');
-      const res = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'eth_getCode',
-          params: [walletAddress, 'latest']
-        })
-      });
-      const json = (await res.json()) as { result?: string };
-      if (json.result === '0x' || json.result === '0x0') {
-        throw new Error(
-          `Smart wallet ${walletAddress} is not yet deployed on-chain. ` +
-            `Send USDC to the wallet address and use the 'send' command to make the first ERC20 transfer — ` +
-            `this will deploy the wallet contract via the Sequence relayer. Then retry send-native.`
-        );
-      }
-    } catch (e) {
-      if ((e as Error).message.includes('not yet deployed')) throw e;
-      // RPC check failed — proceed and let the relayer surface any error
-    }
-  }
-
   if (!broadcast) {
     const bigintReplacer = (_k: string, v: unknown) => (typeof v === 'bigint' ? v.toString() : v);
     console.log(
@@ -320,110 +290,14 @@ export async function runDappClientTx({
     return { walletAddress, dryRun: true };
   }
 
-  const debugFee = ['1', 'true', 'yes'].includes(
-    String(
-      process.env.SEQ_ECO_DEBUG_FEE_OPTIONS || process.env.POLYGON_AGENT_DEBUG_FEE || ''
-    ).toLowerCase()
-  );
-
+  // Let the SDK handle fee selection — including counterfactual (undeployed) wallets.
+  // The SDK routes undeployed wallets through the guest executor and bundles deploy+execute.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let feeOpt: any;
-
-  if (preferNativeFee) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const feeOptions = await client.getFeeOptions(chainId, transactions as any);
-      if (debugFee) console.error(JSON.stringify({ debug: 'feeOptions', feeOptions }, null, 2));
-      const nativeOpt = (feeOptions || []).find(isNativeFeeOption);
-      if (nativeOpt) feeOpt = nativeOpt;
-    } catch {
-      // Fall through to ERC20 fee path
-    }
+  const feeOptions = await client.getFeeOptions(chainId, transactions as any);
+  if (!feeOptions || feeOptions.length === 0) {
+    throw new Error('No fee options available for this transaction.');
   }
-
-  if (!feeOpt) {
-    try {
-      const feeTokens = await client.getFeeTokens(chainId);
-      if (debugFee) console.error(JSON.stringify({ debug: 'feeTokens', feeTokens }, null, 2));
-
-      const paymentAddress = feeTokens?.paymentAddress;
-      const tokens = Array.isArray(feeTokens?.tokens) ? feeTokens.tokens : [];
-
-      const USDC_POLYGON = '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359';
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let erc20Token: any = null;
-      if (tokens.length > 0) {
-        try {
-          const { SequenceIndexer } = await import('@0xsequence/indexer');
-          const chainIndexerUrl = `https://polygon-indexer.sequence.app`;
-          const indexerKey = process.env.SEQUENCE_INDEXER_ACCESS_KEY || projectAccessKey;
-          const indexer = new SequenceIndexer(chainIndexerUrl, indexerKey);
-          const balRes = await indexer.getTokenBalances({
-            accountAddress: walletAddress,
-            includeMetadata: false
-          });
-          const heldAddresses = new Set(
-            (balRes?.balances || []).map((b: { contractAddress?: string }) =>
-              b.contractAddress?.toLowerCase()
-            )
-          );
-          const heldFeeTokens = tokens.filter(
-            (t: { contractAddress?: string }) =>
-              t?.contractAddress && heldAddresses.has(t.contractAddress.toLowerCase())
-          );
-          erc20Token =
-            heldFeeTokens.find(
-              (t: { contractAddress?: string }) => t.contractAddress?.toLowerCase() === USDC_POLYGON
-            ) ||
-            heldFeeTokens.find((t: { symbol?: string }) => t?.symbol === 'USDC') ||
-            heldFeeTokens[0] ||
-            null;
-        } catch {
-          // Indexer unavailable — fall back to symbol matching
-        }
-        if (!erc20Token) {
-          erc20Token =
-            tokens.find(
-              (t: { contractAddress?: string }) =>
-                t?.contractAddress?.toLowerCase() === USDC_POLYGON
-            ) ||
-            tokens.find(
-              (t: { contractAddress?: string; symbol?: string }) =>
-                t?.contractAddress && t?.symbol === 'USDC'
-            ) ||
-            tokens.find((t: { contractAddress?: string }) => t?.contractAddress) ||
-            null;
-        }
-      }
-
-      if (paymentAddress && erc20Token) {
-        const decimals = typeof erc20Token.decimals === 'number' ? erc20Token.decimals : 6;
-        const feeValue = decimals >= 2 ? 10 ** (decimals - 2) : 1;
-        feeOpt = {
-          token: erc20Token,
-          to: paymentAddress,
-          value: String(feeValue),
-          gasLimit: 0
-        };
-        if (debugFee) console.error(JSON.stringify({ debug: 'selectedFee', feeOpt }, null, 2));
-      }
-    } catch (e) {
-      if (debugFee)
-        console.error(
-          JSON.stringify({ debug: 'getFeeTokens failed', error: (e as Error)?.message }, null, 2)
-        );
-    }
-  }
-
-  if (!feeOpt) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const feeOptions = await client.getFeeOptions(chainId, transactions as any);
-      feeOpt = feeOptions?.[0];
-    } catch (e) {
-      throw new Error(`Unable to determine fee option: ${(e as Error)?.message}`);
-    }
-  }
+  const feeOpt = (preferNativeFee && feeOptions.find(isNativeFeeOption)) || feeOptions[0];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const txHash = await client.sendTransaction(chainId, transactions as any, feeOpt);
