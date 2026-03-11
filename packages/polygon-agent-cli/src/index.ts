@@ -18,6 +18,7 @@ import {
   swapCommand,
   x402PayCommand
 } from './commands/operations.ts';
+import { polymarketCommand } from './commands/polymarket.ts';
 import { setupCommand } from './commands/setup.ts';
 import { walletCommand } from './commands/wallet.ts';
 
@@ -89,7 +90,8 @@ const parser = yargs(hideBin(process.argv))
   .command(swapCommand)
   .command(depositCommand)
   .command(x402PayCommand)
-  .command(agentCommand);
+  .command(agentCommand)
+  .command(polymarketCommand);
 
 // Register legacy aliases
 for (const alias of legacyAliases) {
