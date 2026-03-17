@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.3.0](https://github.com/0xPolygon/polygon-agent-cli/compare/@polygonlabs/agent-cli@0.2.2...@polygonlabs/agent-cli@0.3.0) (2026-03-17)
+
+
+### Bug Fixes
+
+* add missing @polymarket/order-utils dependency ([54fe8a2](https://github.com/0xPolygon/polygon-agent-cli/commit/54fe8a2a80c0f40cbad6ad20073e0d51e1309885))
+* bump sequence SDK to beta.17 for counterfactual wallet support ([879e06f](https://github.com/0xPolygon/polygon-agent-cli/commit/879e06fabe1813187a5932ac6adde1c6c78441db))
+* resolve file system race condition in polymarket key storage ([bf12021](https://github.com/0xPolygon/polygon-agent-cli/commit/bf1202160d50987540268539e3b66150cb645ffd))
+
+
+### Features
+
+* **polymarket:** port polymarket feature to TypeScript ([1a67055](https://github.com/0xPolygon/polygon-agent-cli/commit/1a67055e4f02b04f4fbf16e076d500901dcc47f2))
+* **polymarket:** port to TypeScript, fix factory routing, update docs ([48f8636](https://github.com/0xPolygon/polygon-agent-cli/commit/48f8636600a278d512be0c377969e24178325078))
+
+
+
+
+
 ## [0.2.2](https://github.com/0xPolygon/polygon-agent-cli/compare/@polygonlabs/agent-cli@0.2.1...@polygonlabs/agent-cli@0.2.2) (2026-03-05)
 
 
