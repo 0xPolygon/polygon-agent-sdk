@@ -13,6 +13,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "lint": "eslint .",
     "start": "serve dist -s -l ${PORT:-3000}",
     "postinstall": "(cp -n .env.example .env) || echo already exists",
     "typecheck": "tsc --noEmit"

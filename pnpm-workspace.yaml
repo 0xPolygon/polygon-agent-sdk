@@ -10,3 +10,5 @@ minimumReleaseAgeExclude:
   - '@0xsequence/*'
   - '@0xtrails/*'
 trustPolicy: no-downgrade
+trustPolicyExclude:
+  - 'semver@5.7.2 || 6.3.1'
