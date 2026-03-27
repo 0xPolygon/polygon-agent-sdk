@@ -28,9 +28,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "serve": "^14.2.4",
-    "tailwindcss": "^4",
-    "tweetnacl": "^1.0.3",
-    "tweetnacl-sealedbox-js": "^1.2.0"
+    "tailwindcss": "^4"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260317.1",

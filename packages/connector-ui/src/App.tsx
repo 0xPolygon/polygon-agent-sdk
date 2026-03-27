@@ -82,6 +82,10 @@ function App() {
   // Fetch CLI public key from relay on mount
   useEffect(() => {
     if (!rid) return;
+    if (!/^[a-z0-9]{8}$/.test(rid)) {
+      setError('Invalid session link. Please generate a new connection URL.');
+      return;
+    }
     fetch(`/api/relay/request/${rid}`)
       .then((r) => {
         if (!r.ok) throw new Error(`Relay returned ${r.status}`);
@@ -432,7 +436,12 @@ function App() {
             typeof implicit.attestation === 'string'
               ? implicit.attestation
               : JSON.stringify(implicit.attestation, jsonReplacers),
-          identity_sig: identitySignature
+          identity_sig: identitySignature,
+          guard: (implicit as any).guard
+            ? JSON.stringify((implicit as any).guard, jsonReplacers)
+            : undefined,
+          login_method: (implicit as any).loginMethod ?? undefined,
+          user_email: (implicit as any).userEmail ?? undefined
         }
       };
 

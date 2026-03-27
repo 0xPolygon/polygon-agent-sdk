@@ -2,6 +2,10 @@ export interface ImplicitSession {
   pk: string;
   attestation: string;
   identity_sig: string;
+  /** Optional fields preserved for Sequence wallet path compatibility */
+  guard?: string;
+  login_method?: string;
+  user_email?: string;
 }
 
 export interface SessionPermissions {

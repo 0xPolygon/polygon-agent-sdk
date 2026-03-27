@@ -80,12 +80,6 @@ importers:
       tailwindcss:
         specifier: ^4
         version: 4.2.1
-      tweetnacl:
-        specifier: ^1.0.3
-        version: 1.0.3
-      tweetnacl-sealedbox-js:
-        specifier: ^1.2.0
-        version: 1.2.0
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20260317.1
