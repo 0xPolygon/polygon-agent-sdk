@@ -181,6 +181,13 @@ export async function loadWalletRequest(rid: string): Promise<WalletRequest | nu
   return JSON.parse(fs.readFileSync(requestPath, 'utf8'));
 }
 
+export async function deleteWalletRequest(rid: string): Promise<void> {
+  const requestPath = path.join(STORAGE_DIR, 'requests', `${rid}.json`);
+  if (fs.existsSync(requestPath)) {
+    fs.unlinkSync(requestPath);
+  }
+}
+
 export async function listWallets(): Promise<string[]> {
   ensureStorageDir();
 

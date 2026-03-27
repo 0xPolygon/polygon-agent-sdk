@@ -91,7 +91,12 @@ function App() {
         if (!r.ok) throw new Error(`Relay returned ${r.status}`);
         return r.json() as Promise<{ cli_pk_hex: string }>;
       })
-      .then(({ cli_pk_hex }) => setCliPkHex(cli_pk_hex))
+      .then(({ cli_pk_hex }) => {
+        if (!/^[0-9a-f]{64}$/.test(cli_pk_hex)) {
+          throw new Error('Invalid cli_pk_hex format received from relay');
+        }
+        setCliPkHex(cli_pk_hex);
+      })
       .catch((e: any) => setError(`Failed to load session key: ${e?.message || String(e)}`));
   }, [rid]);
 

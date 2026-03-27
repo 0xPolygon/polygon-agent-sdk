@@ -10,7 +10,8 @@ import {
   bytesToHex,
   hexToBytes,
   computeCodeHash,
-  decryptSession
+  decryptSession,
+  MAX_CODE_ATTEMPTS
 } from '@polygonlabs/agent-shared';
 
 import { RelayClient, RelayCodeError } from '../lib/relay-client.ts';
@@ -19,6 +20,7 @@ import {
   loadWalletSession,
   saveWalletRequest,
   loadWalletRequest,
+  deleteWalletRequest,
   listWallets,
   deleteWallet,
   sessionPayloadToWalletSession
@@ -213,14 +215,21 @@ async function decryptAndSaveSession(
   return { walletAddress, chainId, chain };
 }
 
-function promptCode(): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
-    rl.question('Enter the 6-digit code shown in the browser: ', (answer) => {
-      rl.close();
-      resolve(answer.trim());
+async function promptCode(): Promise<string> {
+  // Loop until a valid 6-digit code is entered
+  while (true) {
+    const input = await new Promise<string>((resolve) => {
+      const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+      rl.question('Enter the 6-digit code shown in the browser: ', (answer) => {
+        rl.close();
+        resolve(answer.trim());
+      });
     });
-  });
+    if (/^\d{6}$/.test(input)) {
+      return input;
+    }
+    process.stderr.write('Invalid code: must be exactly 6 digits. Please try again.\n');
+  }
 }
 
 // --- Subcommand: wallet create ---
@@ -324,12 +333,28 @@ async function handleCreateAndWait(argv: CreateArgs): Promise<void> {
 
     const { secretKey: cliSk, publicKey: cliPk } = generateX25519Keypair();
     const cliPkHex = bytesToHex(cliPk);
+    const cliSkHex = bytesToHex(cliSk);
 
     const relay = new RelayClient(connectorBase);
     process.stderr.write('Registering with relay...\n');
     const rid = await relay.createRequest(cliPkHex);
 
     const projectAccessKey = argv['access-key'] || process.env.SEQUENCE_PROJECT_ACCESS_KEY;
+
+    const createdAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min (relay TTL is 5 min)
+
+    await saveWalletRequest(rid, {
+      rid,
+      walletName: name,
+      chain,
+      createdAt,
+      expiresAt,
+      publicKeyB64u: '',
+      privateKeyB64u: '',
+      projectAccessKey: projectAccessKey || null,
+      cliSkHex
+    });
 
     const url = new URL(`${connectorBase}/link`);
     url.searchParams.set('rid', rid);
@@ -369,9 +394,9 @@ async function handleCreateAndWait(argv: CreateArgs): Promise<void> {
     await relay.waitForReady(rid, argv.timeout * 1000, 2_000);
     process.stderr.write('Wallet approved.\n');
 
-    // Prompt for 6-digit code (retry up to 3 times)
+    // Prompt for 6-digit code (retry up to MAX_CODE_ATTEMPTS times)
     let payload;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= MAX_CODE_ATTEMPTS; attempt++) {
       const code = await promptCode();
       const codeHashHex = bytesToHex(computeCodeHash(rid, code));
       try {
@@ -386,7 +411,7 @@ async function handleCreateAndWait(argv: CreateArgs): Promise<void> {
         throw e;
       }
     }
-    if (!payload) throw new Error('Failed to decrypt session after 3 attempts');
+    if (!payload) throw new Error(`Failed to decrypt session after ${MAX_CODE_ATTEMPTS} attempts`);
 
     const session = sessionPayloadToWalletSession(payload);
     await saveWalletSession(name, session);
@@ -471,6 +496,7 @@ async function handleImport(argv: ImportArgs): Promise<void> {
 
       const session = sessionPayloadToWalletSession(payload);
       await saveWalletSession(name, session);
+      await deleteWalletRequest(rid!);
 
       console.log(
         JSON.stringify(

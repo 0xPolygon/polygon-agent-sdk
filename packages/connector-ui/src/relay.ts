@@ -257,7 +257,7 @@ export async function handleRelayRequest(
   // POST /api/relay/session/:rid  → browser posts encrypted payload
   if (request.method === 'POST' && action === 'session') {
     const body = await request.text();
-    if (body.length > 4096) return err('Payload too large', 413);
+    if (body.length > 16384) return err('Payload too large', 413);
     const res = await stub.fetch(
       new Request('https://do/session', {
         method: 'POST',
