@@ -56,6 +56,9 @@ importers:
       '@0xsequence/wallet-primitives':
         specifier: 3.0.0-beta.16
         version: 3.0.0-beta.16(typescript@5.9.3)(zod@3.25.76)
+      '@polygonlabs/agent-shared':
+        specifier: workspace:*
+        version: link:../shared
       '@tailwindcss/vite':
         specifier: ^4.1.18
         version: 4.2.1(vite@5.4.21(@types/node@25.3.3)(lightningcss@1.31.1))
