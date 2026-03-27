@@ -1,10 +1,11 @@
-import { Wallet, Copy, Check, ExternalLink, ArrowRight, AlertCircle } from 'lucide-react';
+import { Wallet, ExternalLink, ArrowRight, AlertCircle } from 'lucide-react';
 
 import './App.css';
 
 import { Hex, Signature } from 'ox';
 import { useEffect, useMemo, useState } from 'react';
-import { seal } from 'tweetnacl-sealedbox-js';
+
+import type { SessionPayload } from '@polygonlabs/agent-shared';
 
 import {
   DappClient,
@@ -14,40 +15,12 @@ import {
   Utils,
   Permission
 } from '@0xsequence/dapp-client';
+import { encryptSession } from '@polygonlabs/agent-shared';
 
+import { CodeDisplay } from './components/CodeDisplay.js';
 import { dappOrigin, projectAccessKey, walletUrl, relayerUrl, nodesUrl } from './config';
-import {
-  fetchBalancesAllChains,
-  pickChainBalances,
-  resolveChainId,
-  resolveNetwork
-} from './indexer';
+import { resolveChainId, resolveNetwork } from './indexer';
 import { resolveErc20Symbol } from './tokenDirectory';
-
-function b64urlDecode(str: string): Uint8Array {
-  const norm = str.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = norm.length % 4 === 0 ? '' : '='.repeat(4 - (norm.length % 4));
-  const bin = atob(norm + pad);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-function b64urlEncode(bytes: Uint8Array): string {
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
-function formatUnits(raw: string, decimals: number): string {
-  if (!raw) return '0';
-  const neg = raw.startsWith('-');
-  const v = neg ? raw.slice(1) : raw;
-  const padded = v.padStart(decimals + 1, '0');
-  const i = padded.slice(0, -decimals);
-  const f = padded.slice(-decimals).replace(/0+$/, '');
-  return `${neg ? '-' : ''}${i}${f ? '.' + f : ''}`;
-}
 
 async function deleteIndexedDb(dbName: string): Promise<void> {
   await new Promise<void>((resolve) => {
@@ -83,52 +56,20 @@ async function resetLocalSessionStateForNewRid(rid: string): Promise<boolean> {
   return true;
 }
 
-type BalanceSummary = {
-  nativeBalances?: Array<{ name: string; symbol: string; balance: string }>;
-  balances?: Array<{
-    contractType: string;
-    contractAddress: string;
-    balance: string;
-    contractInfo?: { symbol?: string; name?: string; decimals?: number; logoURI?: string };
-  }>;
-};
-
 function App() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const rid = params.get('rid') || '';
   const walletName = params.get('wallet') || '';
-  const pub = params.get('pub') || '';
-  const callbackUrl = params.get('callbackUrl') || '';
 
   const chainId = useMemo(() => resolveChainId(params), [params]);
   const network = useMemo(() => resolveNetwork(chainId), [chainId]);
 
   const [error, setError] = useState<string>('');
   const [walletAddress, setWalletAddress] = useState<string>('');
-  const [ciphertext, setCiphertext] = useState<string>('');
-  const [callbackSent, setCallbackSent] = useState<boolean>(false);
-  const [callbackFailed, setCallbackFailed] = useState<boolean>(false);
+  const [cliPkHex, setCliPkHex] = useState<string>('');
+  const [sessionCode, setSessionCode] = useState<string>('');
 
-  const getSafeCallbackUrl = (rawUrl: string): string | null => {
-    if (!rawUrl) return null;
-    try {
-      if (rawUrl.startsWith('/')) return rawUrl;
-      const url = new URL(rawUrl);
-      if (url.protocol === 'https:') return url.toString();
-      if (
-        url.protocol === 'http:' &&
-        (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
-      ) {
-        return url.toString();
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  };
-  const [balances, setBalances] = useState<BalanceSummary | null>(null);
   const [feeTokens, setFeeTokens] = useState<any | null>(null);
-  const [copied, setCopied] = useState(false);
 
   // Reset local session state every time a new rid is opened.
   useEffect(() => {
@@ -136,6 +77,18 @@ function App() {
       const didReset = await resetLocalSessionStateForNewRid(rid);
       if (didReset) window.location.reload();
     })();
+  }, [rid]);
+
+  // Fetch CLI public key from relay on mount
+  useEffect(() => {
+    if (!rid) return;
+    fetch(`/api/relay/request/${rid}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`Relay returned ${r.status}`);
+        return r.json() as Promise<{ cli_pk_hex: string }>;
+      })
+      .then(({ cli_pk_hex }) => setCliPkHex(cli_pk_hex))
+      .catch((e: any) => setError(`Failed to load session key: ${e?.message || String(e)}`));
   }, [rid]);
 
   const dappClient = useMemo(() => {
@@ -168,12 +121,14 @@ function App() {
     // feeTokens are prefetched to keep UX snappy.
     void feeTokens;
     setError('');
-    setCiphertext('');
-    setCallbackSent(false);
-    setCallbackFailed(false);
+    setSessionCode('');
 
-    if (!rid || !walletName || !pub) {
-      setError('Invalid link. Missing rid/wallet/pub.');
+    if (!rid || !walletName) {
+      setError('Invalid link. Missing rid or wallet.');
+      return;
+    }
+    if (!cliPkHex) {
+      setError('Session key not loaded yet. Please wait or refresh.');
       return;
     }
 
@@ -451,141 +406,51 @@ function App() {
         Secp256k1.getPublicKey({ privateKey: OxHex.toBytes(explicit.pk) })
       );
 
-      const payload = {
-        rid,
-        walletName,
-        walletAddress: addr,
-        chainId,
-        explicitSession: {
-          pk: explicit.pk,
-          sessionAddress,
-          config: sessionConfig
+      // Build SessionPayload for v2 relay protocol
+      const sessionPayloadData: SessionPayload = {
+        version: 1,
+        wallet_address: addr,
+        chain_id: chainId,
+        session_private_key: explicit.pk,
+        session_address: sessionAddress,
+        permissions: {
+          native_limit: polValueLimit.toString(),
+          erc20_limits: [],
+          contract_calls: []
         },
-        implicit: {
-          pk: implicit.pk,
-          attestation: implicit.attestation,
-          identitySignature,
-          chainId: implicit.chainId,
-          // Immutable uses guard/keymachine; preserve metadata so headless can initialize correctly.
-          guard: (implicit as any).guard,
-          loginMethod: (implicit as any).loginMethod,
-          userEmail: (implicit as any).userEmail
+        expiry: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 183,
+        ecosystem_wallet_url: walletUrl,
+        dapp_origin: dappOrigin,
+        project_access_key: projectAccessKey,
+        session_config: JSON.stringify(sessionConfig, jsonReplacers),
+        implicit_session: {
+          pk:
+            typeof implicit.pk === 'string'
+              ? implicit.pk
+              : JSON.stringify(implicit.pk, jsonReplacers),
+          attestation:
+            typeof implicit.attestation === 'string'
+              ? implicit.attestation
+              : JSON.stringify(implicit.attestation, jsonReplacers),
+          identity_sig: identitySignature
         }
       };
 
-      const pubBytes = b64urlDecode(pub);
-      const msg = new TextEncoder().encode(JSON.stringify(payload, jsonReplacers));
-      const sealed = seal(msg, pubBytes);
-      const ciphertextB64u = b64urlEncode(sealed);
-      setCiphertext(ciphertextB64u);
+      // Encrypt and post to relay
+      const { encrypted, code } = encryptSession(sessionPayloadData, cliPkHex, rid);
+      const relayRes = await fetch(`/api/relay/session/${rid}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(encrypted)
+      });
+      if (!relayRes.ok) throw new Error(`Failed to deliver session to relay (${relayRes.status})`);
 
-      // Deliver ciphertext to the callback URL.
-      // HTTPS callbacks (cloudflared tunnel): use fetch so the page stays and can show fallback ciphertext on error.
-      // Localhost callbacks: must use form submission — fetch is blocked by mixed-content from HTTPS pages.
-      const safeCallbackUrl = getSafeCallbackUrl(callbackUrl);
-      const isHttpsCallback = !!callbackUrl && callbackUrl.startsWith('https://');
-      const isLocalCallback =
-        !!callbackUrl &&
-        (callbackUrl.startsWith('http://localhost:') ||
-          callbackUrl.startsWith('http://127.0.0.1:'));
-
-      if (isHttpsCallback && safeCallbackUrl) {
-        try {
-          const res = await fetch(safeCallbackUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ rid, ciphertext: ciphertextB64u })
-          });
-          if (res.ok) {
-            setCallbackSent(true);
-          } else {
-            setCallbackFailed(true);
-          }
-        } catch {
-          setCallbackFailed(true);
-        }
-        return;
-      }
-
-      if (isLocalCallback && safeCallbackUrl) {
-        // Form submission is a top-level navigation — browsers allow it across HTTP/HTTPS boundaries.
-        setCallbackSent(true);
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = safeCallbackUrl;
-        form.style.display = 'none';
-        const ridInput = document.createElement('input');
-        ridInput.type = 'hidden';
-        ridInput.name = 'rid';
-        ridInput.value = rid;
-        form.appendChild(ridInput);
-        const ctInput = document.createElement('input');
-        ctInput.type = 'hidden';
-        ctInput.name = 'ciphertext';
-        ctInput.value = ciphertextB64u;
-        form.appendChild(ctInput);
-        document.body.appendChild(form);
-        form.submit();
-        return;
-      }
-
-      if (callbackUrl && !safeCallbackUrl) {
-        // URL is set but couldn't be validated — show ciphertext for manual copy.
-        setCallbackFailed(true);
-        return;
-      }
-
-      // No callback URL — fetch balances and show ciphertext for manual copy
-      try {
-        const all = await fetchBalancesAllChains(addr);
-        const picked = pickChainBalances(all, chainId);
-        setBalances(picked);
-      } catch {
-        setBalances(null);
-      }
+      setSessionCode(code);
     } catch (e: any) {
       console.error(e);
       setError(e?.message || String(e));
     }
   };
-
-  const copyCiphertext = async () => {
-    if (!ciphertext) return;
-    await navigator.clipboard.writeText(ciphertext);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const downloadCiphertext = () => {
-    if (!ciphertext) return;
-    const blob = new Blob([ciphertext], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `session-${rid || 'blob'}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const nativeRows = (balances?.nativeBalances || []).map((b) => ({
-    key: `native:${b.symbol}`,
-    symbol: b.symbol || b.name || 'NATIVE',
-    decimals: 18,
-    balance: b.balance,
-    logoURI: undefined as string | undefined
-  }));
-
-  const erc20Rows = (balances?.balances || []).map((b) => ({
-    key: `erc20:${b.contractAddress}`,
-    symbol: b.contractInfo?.symbol || 'ERC20',
-    decimals: b.contractInfo?.decimals ?? 0,
-    balance: b.balance,
-    logoURI: b.contractInfo?.logoURI
-  }));
-
-  const allRows = [...nativeRows, ...erc20Rows];
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 sm:p-8">
@@ -629,8 +494,8 @@ function App() {
             <div className="p-6 space-y-5 animate-fade-in">
               {/* Instructions */}
               <p className="text-sm text-text-secondary leading-relaxed">
-                Click connect, approve the session for your agent, then the encrypted blob will be
-                sent back to your agent to create a secure session.
+                Click connect and approve the wallet session. You&apos;ll then see a 6-digit code to
+                enter in your terminal.
               </p>
 
               {/* Connect Button */}
@@ -654,7 +519,7 @@ function App() {
           )}
 
           {/* ======== POST-CONNECT STATE ======== */}
-          {walletAddress && (
+          {walletAddress && !sessionCode && (
             <div className="p-6 space-y-5 animate-slide-up">
               {/* Wallet Address Badge */}
               <div>
@@ -679,170 +544,33 @@ function App() {
                 </div>
               </div>
 
-              {/* Balance Table */}
-              {balances && allRows.length > 0 && (
-                <div>
-                  <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                    Balances
-                  </label>
-                  <div className="mt-2 rounded-xl bg-surface-elevated border border-border overflow-hidden divide-y divide-border">
-                    {allRows.map((row, i) => (
-                      <div
-                        key={row.key}
-                        className="flex items-center justify-between px-4 py-3 hover:bg-surface-hover transition-colors opacity-0 animate-slide-up"
-                        style={{ animationDelay: `${0.1 + i * 0.05}s` }}
-                      >
-                        <div className="flex items-center gap-3">
-                          {row.logoURI ? (
-                            <img
-                              src={row.logoURI}
-                              alt=""
-                              className="w-7 h-7 rounded-full ring-1 ring-border"
-                            />
-                          ) : (
-                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-poly/40 to-poly-dark/30 ring-1 ring-border flex items-center justify-center">
-                              <span className="text-xs font-semibold text-text-secondary">
-                                {row.symbol.charAt(0)}
-                              </span>
-                            </div>
-                          )}
-                          <span className="text-sm font-medium text-text-primary">
-                            {row.symbol}
-                          </span>
-                        </div>
-                        <span className="text-sm font-semibold text-text-primary font-mono tabular-nums">
-                          {formatUnits(row.balance, row.decimals)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+              {/* Encrypting state */}
+              <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl bg-surface-elevated border border-border">
+                <div
+                  className="w-4 h-4 rounded-full border-2 border-poly border-t-transparent shrink-0"
+                  style={{ animation: 'spin 0.8s linear infinite' }}
+                />
+                <p className="text-sm text-text-secondary">Encrypting session...</p>
+              </div>
+
+              {/* Error */}
+              {error && (
+                <div className="flex items-start gap-2 px-3.5 py-3 rounded-xl bg-error-glow border border-error/20 animate-slide-up">
+                  <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
+                  <p className="text-sm text-error">{error}</p>
                 </div>
               )}
+            </div>
+          )}
 
-              {/* Divider */}
-              <div className="border-t border-border" />
-
-              {/* Next Step */}
-              <div>
-                <label className="text-xs font-medium text-text-muted uppercase tracking-wider">
-                  Next Step
-                </label>
-
-                {/* Success: callback sent */}
-                {callbackUrl && callbackSent && (
-                  <div className="mt-3 flex items-start gap-3 px-4 py-4 rounded-xl bg-success-glow border border-success/20 animate-scale-in">
-                    <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center shrink-0">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                        <path
-                          className="check-circle"
-                          d="M5 13l4 4L19 7"
-                          stroke="#22c55e"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-success">
-                        Session encrypted &amp; sent
-                      </p>
-                      <p className="text-xs text-text-secondary mt-1">
-                        Switch back to your agent — it will confirm once the wallet session is
-                        ingested.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Callback failed */}
-                {callbackUrl && callbackFailed && (
-                  <div className="mt-3 flex items-start gap-2 px-3.5 py-3 rounded-xl bg-error-glow border border-error/20 animate-slide-up">
-                    <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
-                    <p className="text-sm text-text-secondary">
-                      Auto-send failed. Copy the encrypted blob manually below.
-                    </p>
-                  </div>
-                )}
-
-                {/* Callback in progress */}
-                {callbackUrl && !callbackSent && !callbackFailed && (
-                  <div className="mt-3 flex items-center gap-3 px-3.5 py-3 rounded-xl bg-surface-elevated border border-border">
-                    <div
-                      className="w-4 h-4 rounded-full border-2 border-poly border-t-transparent"
-                      style={{ animation: 'spin 0.8s linear infinite' }}
-                    />
-                    <p className="text-sm text-text-secondary">
-                      Sending encrypted session to callback...
-                    </p>
-                  </div>
-                )}
-
-                {/* No callback - manual copy */}
-                {!callbackUrl && ciphertext && (
-                  <p className="mt-3 text-sm text-text-secondary">
-                    Copy the encrypted blob and paste it to your CLI or agent.
-                  </p>
-                )}
-
-                {/* Ciphertext textarea + copy button */}
-                {ciphertext && (!callbackUrl || callbackFailed) && (
-                  <div
-                    className="mt-3 space-y-3 animate-slide-up"
-                    style={{ animationDelay: '0.15s' }}
-                  >
-                    <textarea
-                      readOnly
-                      value={ciphertext}
-                      className="cipher-textarea w-full h-32 px-3.5 py-3 rounded-xl bg-black/30 border border-border text-text-secondary font-mono text-xs leading-relaxed focus:outline-none focus:border-poly/40 focus:ring-1 focus:ring-poly/20 transition-all"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        className="btn-press flex-1 h-11 rounded-xl bg-surface-hover border border-border text-text-primary font-medium text-sm hover:border-border-hover transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
-                        onClick={copyCiphertext}
-                      >
-                        {copied ? (
-                          <>
-                            <Check className="w-4 h-4 text-success" />
-                            <span className="text-success">Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-4 h-4" />
-                            Copy
-                          </>
-                        )}
-                      </button>
-                      <button
-                        className="btn-press flex-1 h-11 rounded-xl bg-surface-hover border border-border text-text-primary font-medium text-sm hover:border-border-hover transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
-                        onClick={downloadCiphertext}
-                      >
-                        <ArrowRight className="w-4 h-4 rotate-90" />
-                        Download .txt
-                      </button>
-                    </div>
-                    <p className="text-xs text-text-muted">
-                      Paste to your agent or run:{' '}
-                      <code className="text-text-secondary">
-                        polygon-agent wallet import --ciphertext @session.txt
-                      </code>
-                    </p>
-                  </div>
-                )}
-
-                {/* No ciphertext yet */}
-                {!ciphertext && (
-                  <p className="mt-3 text-xs text-text-muted">No ciphertext generated yet.</p>
-                )}
-
-                {/* Error */}
-                {error && (
-                  <div className="mt-3 flex items-start gap-2 px-3.5 py-3 rounded-xl bg-error-glow border border-error/20 animate-slide-up">
-                    <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
-                    <p className="text-sm text-error">{error}</p>
-                  </div>
-                )}
-              </div>
+          {/* ======== CODE DISPLAY STATE ======== */}
+          {sessionCode && (
+            <div className="p-6 animate-slide-up">
+              <CodeDisplay
+                code={sessionCode}
+                walletAddress={walletAddress}
+                walletName={walletName}
+              />
             </div>
           )}
 
