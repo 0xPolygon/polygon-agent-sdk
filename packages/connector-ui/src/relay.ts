@@ -174,7 +174,7 @@ export class SessionRelay {
     ]);
     await this.state.storage.deleteAll();
 
-    return json({ wallet_pk_hex, nonce_hex, ciphertext_b64url });
+    return json({ wallet_pk_hex, nonce_hex, ciphertext_b64url, code_hash_hex: stored });
   }
 
   async alarm(): Promise<void> {
