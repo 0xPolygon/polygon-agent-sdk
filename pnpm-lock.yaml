@@ -87,6 +87,9 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0
     devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20260317.1
+        version: 4.20260317.1
       '@types/react':
         specifier: ^18.3.3
         version: 18.3.28
@@ -101,7 +104,7 @@ importers:
         version: 5.4.21(@types/node@25.3.3)(lightningcss@1.31.1)
       wrangler:
         specifier: ^4.67.0
-        version: 4.69.0
+        version: 4.69.0(@cloudflare/workers-types@4.20260317.1)
 
   packages/polygon-agent-cli:
     dependencies:
@@ -415,6 +418,9 @@ packages:
     engines: {node: '>=16'}
     cpu: [x64]
     os: [win32]
+
+  '@cloudflare/workers-types@4.20260317.1':
+    resolution: {integrity: sha512-+G4eVwyCpm8Au1ex8vQBCuA9wnwqetz4tPNRoB/53qvktERWBRMQnrtvC1k584yRE3emMThtuY0gWshvSJ++PQ==}
 
   '@commitlint/cli@20.4.2':
     resolution: {integrity: sha512-YjYSX2yj/WsVoxh9mNiymfFS2ADbg2EK4+1WAsMuckwKMCqJ5PDG0CJU/8GvmHWcv4VRB2V02KqSiecRksWqZQ==}
@@ -5530,6 +5536,8 @@ snapshots:
   '@cloudflare/workerd-windows-64@1.20260305.0':
     optional: true
 
+  '@cloudflare/workers-types@4.20260317.1': {}
+
   '@commitlint/cli@20.4.2(@types/node@22.19.13)(typescript@5.9.3)':
     dependencies:
       '@commitlint/format': 20.4.0
@@ -10500,7 +10508,7 @@ snapshots:
       '@cloudflare/workerd-linux-arm64': 1.20260305.0
       '@cloudflare/workerd-windows-64': 1.20260305.0
 
-  wrangler@4.69.0:
+  wrangler@4.69.0(@cloudflare/workers-types@4.20260317.1):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.4.2
       '@cloudflare/unenv-preset': 2.14.0(unenv@2.0.0-rc.24)(workerd@1.20260305.0)
@@ -10511,6 +10519,7 @@ snapshots:
       unenv: 2.0.0-rc.24
       workerd: 1.20260305.0
     optionalDependencies:
+      '@cloudflare/workers-types': 4.20260317.1
       fsevents: 2.3.3
     transitivePeerDependencies:
       - bufferutil

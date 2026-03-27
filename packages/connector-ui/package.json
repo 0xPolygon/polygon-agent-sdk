@@ -19,9 +19,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@polygonlabs/agent-shared": "workspace:*",
     "@0xsequence/dapp-client": "3.0.0-beta.16",
     "@0xsequence/wallet-primitives": "3.0.0-beta.16",
+    "@polygonlabs/agent-shared": "workspace:*",
     "@tailwindcss/vite": "^4.1.18",
     "lucide-react": "^0.564.0",
     "ox": "^0.11.3",
@@ -33,6 +33,7 @@
     "tweetnacl-sealedbox-js": "^1.2.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260317.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
