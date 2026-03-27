@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import type { SessionPayload } from '@polygonlabs/agent-shared';
+
 const STORAGE_DIR = path.join(os.homedir(), '.polygon-agent');
 const ENCRYPTION_KEY_FILE = path.join(STORAGE_DIR, '.encryption-key');
 
@@ -153,6 +155,8 @@ export interface WalletRequest {
   publicKeyB64u: string;
   privateKeyB64u: string;
   projectAccessKey: string | null;
+  /** v2: X25519 secret key hex (used with relay-based code flow) */
+  cliSkHex?: string;
 }
 
 export async function saveWalletRequest(rid: string, request: WalletRequest): Promise<void> {
@@ -220,4 +224,43 @@ export async function loadPolymarketKey(): Promise<string> {
   throw new Error(
     'No EOA key found. Run: polygon-agent setup or polygon-agent polymarket set-key <privateKey>'
   );
+}
+
+/** Map a v2 SessionPayload into the WalletSession shape. */
+export function sessionPayloadToWalletSession(payload: SessionPayload): WalletSession {
+  const chainName = resolveChainNameFromId(payload.chain_id);
+  const implicit = payload.implicit_session;
+
+  const implicitMeta = {
+    guard: implicit?.guard,
+    loginMethod: implicit?.login_method,
+    userEmail: implicit?.user_email
+  };
+
+  return {
+    walletAddress: payload.wallet_address,
+    chainId: payload.chain_id,
+    chain: chainName,
+    projectAccessKey: payload.project_access_key ?? null,
+    explicitSession: payload.session_config ?? '',
+    sessionPk: payload.session_private_key,
+    implicitPk: implicit?.pk ?? '',
+    implicitMeta: JSON.stringify(implicitMeta),
+    implicitAttestation: implicit?.attestation ?? '',
+    implicitIdentitySig: implicit?.identity_sig ?? '',
+    createdAt: new Date().toISOString()
+  };
+}
+
+/** Map numeric chainId to chain name string (e.g. 137 → "polygon"). */
+function resolveChainNameFromId(chainId: number): string {
+  const map: Record<number, string> = {
+    137: 'polygon',
+    80002: 'polygon-amoy',
+    42161: 'arbitrum',
+    10: 'optimism',
+    8453: 'base',
+    1: 'mainnet'
+  };
+  return map[chainId] ?? String(chainId);
 }

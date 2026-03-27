@@ -1,43 +1,35 @@
 import type { Argv, CommandModule } from 'yargs';
 
-import { spawn, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
+import readline from 'node:readline';
 
-import nacl from 'tweetnacl';
-import sealedbox from 'tweetnacl-sealedbox-js';
+import {
+  generateX25519Keypair,
+  bytesToHex,
+  hexToBytes,
+  computeCodeHash,
+  decryptSession
+} from '@polygonlabs/agent-shared';
 
+import { RelayClient, RelayCodeError } from '../lib/relay-client.ts';
 import {
   saveWalletSession,
   loadWalletSession,
   saveWalletRequest,
   loadWalletRequest,
   listWallets,
-  deleteWallet
+  deleteWallet,
+  sessionPayloadToWalletSession
 } from '../lib/storage.ts';
 import { normalizeChain, resolveNetwork, fileCoerce } from '../lib/utils.ts';
-
-// Base64 URL encode
-function b64urlEncode(buf: Uint8Array): string {
-  return Buffer.from(buf)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '');
-}
 
 // Base64 URL decode
 function b64urlDecode(str: string): Buffer {
   const norm = str.replace(/-/g, '+').replace(/_/g, '/');
   const pad = norm.length % 4 === 0 ? '' : '='.repeat(4 - (norm.length % 4));
   return Buffer.from(norm + pad, 'base64');
-}
-
-// Generate random ID
-function randomId(bytes = 16): string {
-  return b64urlEncode(nacl.randomBytes(bytes));
 }
 
 // Contracts always whitelisted in sessions.
@@ -152,6 +144,8 @@ async function decryptAndSaveSession(
   const privateKey = b64urlDecode(request.privateKeyB64u);
   const ciphertextBuf = b64urlDecode(ciphertext);
 
+  // Dynamic import to avoid bundling sealedbox if not needed
+  const sealedbox = (await import('tweetnacl-sealedbox-js')).default;
   const decrypted = sealedbox.open(ciphertextBuf, publicKey, privateKey);
   if (!decrypted) {
     throw new Error('Failed to decrypt ciphertext');
@@ -219,136 +213,13 @@ async function decryptAndSaveSession(
   return { walletAddress, chainId, chain };
 }
 
-// cloudflared helpers
-function cloudflaredDownloadInfo(): { url: string; tar: boolean } {
-  const base = 'https://github.com/cloudflare/cloudflared/releases/latest/download/';
-  const p = process.platform;
-  const a = process.arch;
-  if (p === 'darwin') {
-    const arch = a === 'arm64' ? 'arm64' : 'amd64';
-    return { url: `${base}cloudflared-darwin-${arch}.tgz`, tar: true };
-  }
-  if (p === 'linux') {
-    const arch = a === 'arm64' ? 'arm64' : 'amd64';
-    return { url: `${base}cloudflared-linux-${arch}`, tar: false };
-  }
-  if (p === 'win32') {
-    return { url: `${base}cloudflared-windows-amd64.exe`, tar: false };
-  }
-  throw new Error(`Unsupported platform for cloudflared auto-download: ${p}/${a}`);
-}
-
-async function resolveCloudflared(): Promise<string> {
-  try {
-    execFileSync('cloudflared', ['--version'], { stdio: 'ignore' });
-    return 'cloudflared';
-  } catch {
-    // not in PATH
-  }
-
-  const ext = process.platform === 'win32' ? '.exe' : '';
-  const binDir = path.join(os.homedir(), '.polygon-agent', 'bin');
-  const binPath = path.join(binDir, `cloudflared${ext}`);
-  if (fs.existsSync(binPath)) return binPath;
-
-  console.error('[cloudflared] Binary not found — downloading...');
-  fs.mkdirSync(binDir, { recursive: true });
-
-  const { url, tar } = cloudflaredDownloadInfo();
-  const res = await fetch(url, { redirect: 'follow' });
-  if (!res.ok) throw new Error(`Failed to download cloudflared: HTTP ${res.status} from ${url}`);
-
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (tar) {
-    const tmpTar = binPath + '.tgz';
-    fs.writeFileSync(tmpTar, buf);
-    execFileSync('tar', ['-xzf', tmpTar, '-C', binDir], { stdio: 'ignore' });
-    fs.unlinkSync(tmpTar);
-    if (!fs.existsSync(binPath))
-      throw new Error('cloudflared binary not found after extracting archive');
-  } else {
-    fs.writeFileSync(binPath, buf);
-  }
-
-  fs.chmodSync(binPath, 0o755);
-  console.error(`[cloudflared] Downloaded to ${binPath}`);
-  return binPath;
-}
-
-async function startCloudflaredTunnel(
-  port: number
-): Promise<{ publicUrl: string; process: ReturnType<typeof spawn> }> {
-  const bin = await resolveCloudflared();
-  return new Promise((resolve, reject) => {
-    const proc = spawn(bin, ['tunnel', '--url', `http://localhost:${port}`, '--no-autoupdate'], {
-      stdio: ['ignore', 'pipe', 'pipe']
+function promptCode(): Promise<string> {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+    rl.question('Enter the 6-digit code shown in the browser: ', (answer) => {
+      rl.close();
+      resolve(answer.trim());
     });
-
-    let settled = false;
-    const urlRe = /https:\/\/[a-zA-Z0-9][-a-zA-Z0-9]*\.trycloudflare\.com/;
-
-    const onData = (chunk: Buffer) => {
-      if (settled) return;
-      const text = String(chunk);
-      const match = text.match(urlRe);
-      if (match) {
-        settled = true;
-        clearTimeout(timer);
-        resolve({ publicUrl: match[0], process: proc });
-      }
-    };
-
-    const timer = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        proc.kill();
-        reject(new Error('Timed out waiting for cloudflared tunnel URL (20s)'));
-      }
-    }, 20000);
-
-    proc.stdout?.on('data', onData);
-    proc.stderr?.on('data', onData);
-    proc.on('error', (err) => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timer);
-        reject(err);
-      }
-    });
-    proc.on('exit', (code) => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timer);
-        reject(new Error(`cloudflared exited with code ${code}`));
-      }
-    });
-  });
-}
-
-function promiseWithResolvers<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-}
-
-async function readBlobFromStdin(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let data = '';
-    process.stdin.setEncoding('utf8');
-    process.stdin.resume();
-    process.stdin.on('data', (chunk) => {
-      data += chunk;
-      if (data.includes('\n')) {
-        process.stdin.pause();
-        resolve(data.trim());
-      }
-    });
-    process.stdin.on('error', reject);
-    process.stdin.on('end', () => resolve(data.trim()));
   });
 }
 
@@ -374,18 +245,22 @@ async function handleCreateNoWait(argv: CreateArgs): Promise<void> {
 
   try {
     const chain = normalizeChain(chainArg);
-    const connectorUrl =
-      process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL || 'https://agentconnect.polygon.technology/';
+    const connectorBase = (
+      process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL || 'https://agentconnect.polygon.technology'
+    ).replace(/\/$/, '');
 
-    const rid = randomId(16);
-    const kp = nacl.box.keyPair();
-    const pub = b64urlEncode(kp.publicKey);
-    const priv = b64urlEncode(kp.secretKey);
+    const { secretKey: cliSk, publicKey: cliPk } = generateX25519Keypair();
+    const cliPkHex = bytesToHex(cliPk);
+    const cliSkHex = bytesToHex(cliSk);
 
-    const createdAt = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    const relay = new RelayClient(connectorBase);
+    process.stderr.write('Registering with relay...\n');
+    const rid = await relay.createRequest(cliPkHex);
 
     const projectAccessKey = argv['access-key'] || process.env.SEQUENCE_PROJECT_ACCESS_KEY;
+
+    const createdAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 min (relay TTL is 5 min)
 
     await saveWalletRequest(rid, {
       rid,
@@ -393,22 +268,17 @@ async function handleCreateNoWait(argv: CreateArgs): Promise<void> {
       chain,
       createdAt,
       expiresAt,
-      publicKeyB64u: pub,
-      privateKeyB64u: priv,
-      projectAccessKey: projectAccessKey || null
+      publicKeyB64u: '',
+      privateKeyB64u: '',
+      projectAccessKey: projectAccessKey || null,
+      cliSkHex
     });
 
-    const url = new URL(connectorUrl);
-    url.pathname = url.pathname.replace(/\/$/, '') + '/link';
+    const url = new URL(`${connectorBase}/link`);
     url.searchParams.set('rid', rid);
     url.searchParams.set('wallet', name);
-    url.searchParams.set('pub', pub);
     url.searchParams.set('chain', chain);
-
-    if (projectAccessKey) {
-      url.searchParams.set('accessKey', projectAccessKey);
-    }
-
+    if (projectAccessKey) url.searchParams.set('accessKey', projectAccessKey);
     applySessionPermissionParams(url, argv);
 
     const fullUrl = url.toString();
@@ -422,22 +292,18 @@ async function handleCreateNoWait(argv: CreateArgs): Promise<void> {
           url: fullUrl,
           expiresAt,
           message:
-            'IMPORTANT: Output the COMPLETE url below to the user. Do NOT truncate or shorten it. The user must open this exact URL in a browser to approve the wallet session.',
+            'IMPORTANT: Output the COMPLETE approvalUrl to the user. After they approve in the browser, they will see a 6-digit code. Run: polygon-agent wallet import --rid <rid> --code <code>',
           approvalUrl: fullUrl
         },
         null,
         2
       )
     );
-    console.error(`\nApprove wallet session (copy FULL url):\n${fullUrl}\n`);
+    console.error(`\nApprove wallet session:\n${fullUrl}\n`);
   } catch (error) {
     console.error(
       JSON.stringify(
-        {
-          ok: false,
-          error: (error as Error).message,
-          stack: (error as Error).stack
-        },
+        { ok: false, error: (error as Error).message, stack: (error as Error).stack },
         null,
         2
       )
@@ -449,160 +315,30 @@ async function handleCreateNoWait(argv: CreateArgs): Promise<void> {
 async function handleCreateAndWait(argv: CreateArgs): Promise<void> {
   const name = argv.name;
   const chainArg = argv.chain;
-  const timeoutSec = argv.timeout;
 
   try {
     const chain = normalizeChain(chainArg);
-    const connectorUrl =
-      process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL || 'https://agentconnect.polygon.technology/';
+    const connectorBase = (
+      process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL || 'https://agentconnect.polygon.technology'
+    ).replace(/\/$/, '');
 
-    const rid = randomId(16);
-    const kp = nacl.box.keyPair();
-    const pub = b64urlEncode(kp.publicKey);
-    const priv = b64urlEncode(kp.secretKey);
+    const { secretKey: cliSk, publicKey: cliPk } = generateX25519Keypair();
+    const cliPkHex = bytesToHex(cliPk);
 
-    const createdAt = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    const relay = new RelayClient(connectorBase);
+    process.stderr.write('Registering with relay...\n');
+    const rid = await relay.createRequest(cliPkHex);
 
     const projectAccessKey = argv['access-key'] || process.env.SEQUENCE_PROJECT_ACCESS_KEY;
 
-    await saveWalletRequest(rid, {
-      rid,
-      walletName: name,
-      chain,
-      createdAt,
-      expiresAt,
-      publicKeyB64u: pub,
-      privateKeyB64u: priv,
-      projectAccessKey: projectAccessKey || null
-    });
-
-    const callbackToken = randomId(24);
-    const callbackPath = `/callback/${callbackToken}`;
-
-    const { resolve: resolveCallback, promise: callbackPromise } = promiseWithResolvers<string>();
-
-    const SUCCESS_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Session Approved</title>
-<style>body{font-family:-apple-system,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0a0a0f;color:#e5e5e5}
-.card{text-align:center;padding:2rem;border-radius:1rem;background:#16161f;border:1px solid #2a2a3a;max-width:360px}
-.check{width:48px;height:48px;margin:0 auto 1rem;border-radius:50%;background:rgba(34,197,94,.15);display:flex;align-items:center;justify-content:center}
-h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem;color:#888}</style></head>
-<body><div class="card"><div class="check"><svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-<h2>Session Approved</h2><p>You can close this tab and return to your CLI.</p></div></body></html>`;
-
-    const MAX_BODY = 65536;
-    const server = http.createServer((req, res) => {
-      const corsOrigin = req.headers.origin || '*';
-      const corsHeaders: Record<string, string> = {
-        'Access-Control-Allow-Origin': corsOrigin,
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        Vary: 'Origin'
-      };
-      if (req.method === 'OPTIONS') {
-        res.writeHead(204, corsHeaders);
-        res.end();
-        return;
-      }
-      if (req.method !== 'POST' || req.url !== callbackPath) {
-        res.writeHead(404, {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        });
-        res.end(JSON.stringify({ error: 'Not found' }));
-        return;
-      }
-      let body = '';
-      let size = 0;
-      req.on('data', (chunk: Buffer) => {
-        size += chunk.length;
-        if (size > MAX_BODY) {
-          res.writeHead(413, corsHeaders);
-          res.end('Payload too large');
-          req.destroy();
-          return;
-        }
-        body += chunk;
-      });
-      req.on('end', () => {
-        try {
-          const ct = (req.headers['content-type'] || '').toLowerCase();
-          const data = ct.includes('application/x-www-form-urlencoded')
-            ? Object.fromEntries(new URLSearchParams(body))
-            : JSON.parse(body);
-          if (!data.ciphertext || typeof data.ciphertext !== 'string') {
-            res.writeHead(400, corsHeaders);
-            res.end('Missing ciphertext');
-            return;
-          }
-          res.writeHead(200, {
-            'Content-Type': 'text/html; charset=utf-8',
-            ...corsHeaders
-          });
-          res.end(SUCCESS_HTML);
-          resolveCallback(data.ciphertext);
-        } catch {
-          res.writeHead(400, corsHeaders);
-          res.end('Invalid request body');
-        }
-      });
-    });
-
-    await new Promise<void>((resolve, reject) => {
-      server.listen(0, '127.0.0.1', () => resolve());
-      server.on('error', reject);
-    });
-    const port = (server.address() as { port: number }).port;
-
-    let tunnel: { publicUrl: string; process: ReturnType<typeof spawn> } | null = null;
-    let callbackUrl: string | null = null;
-    let callbackMode = 'manual';
-
-    try {
-      tunnel = await startCloudflaredTunnel(port);
-      callbackUrl = `${tunnel.publicUrl}${callbackPath}`;
-      callbackMode = 'tunnel';
-      console.error(`[tunnel] Public callback: ${tunnel.publicUrl}`);
-    } catch (tunnelErr) {
-      try {
-        server.close();
-      } catch {
-        // ignore
-      }
-      console.error(
-        `[tunnel] cloudflared unavailable (${(tunnelErr as Error)?.message || 'unknown'}), falling back to manual mode`
-      );
-    }
-
-    const cleanup = () => {
-      try {
-        server.close();
-      } catch {
-        // ignore
-      }
-      try {
-        tunnel?.process?.kill();
-      } catch {
-        // ignore
-      }
-    };
-    process.once('SIGINT', () => {
-      cleanup();
-      process.exit(130);
-    });
-
-    const url = new URL(connectorUrl);
-    url.pathname = url.pathname.replace(/\/$/, '') + '/link';
+    const url = new URL(`${connectorBase}/link`);
     url.searchParams.set('rid', rid);
     url.searchParams.set('wallet', name);
-    url.searchParams.set('pub', pub);
     url.searchParams.set('chain', chain);
-    if (callbackUrl) url.searchParams.set('callbackUrl', callbackUrl);
     if (projectAccessKey) url.searchParams.set('accessKey', projectAccessKey);
     applySessionPermissionParams(url, argv);
 
     const fullUrl = url.toString();
-    const isManual = callbackMode === 'manual';
     console.log(
       JSON.stringify(
         {
@@ -611,63 +347,58 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
           chain,
           rid,
           url: fullUrl,
-          callbackMode,
-          expiresAt,
-          message: isManual
-            ? 'IMPORTANT: Output the COMPLETE approvalUrl to the user. After they approve in the browser, the encrypted blob will be displayed. Ask them to paste it back so you can complete the import.'
-            : `IMPORTANT: Output the COMPLETE url below to the user. Do NOT truncate or shorten it. The user must open this exact URL in a browser to approve the wallet session. Waiting for approval (timeout ${timeoutSec}s)...`,
+          message: `IMPORTANT: Output the COMPLETE url to the user. They must open it in a browser, approve the session, and enter the 6-digit code that appears in the terminal prompt.`,
           approvalUrl: fullUrl
         },
         null,
         2
       )
     );
-    console.error(`\nApprove wallet session (copy FULL url):\n${fullUrl}\n`);
+    console.error(`\nApprove wallet session:\n${fullUrl}\n`);
 
-    let ct: string;
-    if (isManual) {
-      console.error('After approving in the browser, the encrypted blob will be shown.');
-      console.error('Paste it below and press Enter (or Ctrl+C to cancel):\n');
-      process.stderr.write('> ');
-      ct = await readBlobFromStdin();
-      const tmpFile = path.join(os.tmpdir(), `polygon-session-${rid}.txt`);
-      try {
-        fs.writeFileSync(tmpFile, ct, 'utf8');
-        console.error(`\n[manual] Blob saved to: ${tmpFile}`);
-        console.error(
-          `[manual] To import later: polygon-agent wallet import --ciphertext @${tmpFile}`
-        );
-      } catch {
-        // ignore
-      }
-    } else {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`Timed out waiting for callback (${timeoutSec}s)`)),
-          timeoutSec * 1000
-        )
-      );
-      try {
-        ct = await Promise.race([callbackPromise, timeoutPromise]);
-      } finally {
-        cleanup();
-      }
+    // Try to open browser automatically
+    try {
+      const { default: open } = await import('open');
+      await open(fullUrl);
+    } catch {
+      // ignore — URL already printed above
     }
 
-    const {
-      walletAddress,
-      chainId,
-      chain: resolvedChain
-    } = await decryptAndSaveSession(name, ct, rid);
+    // Poll relay until browser posts the encrypted session
+    process.stderr.write('Waiting for wallet approval in browser...\n');
+    await relay.waitForReady(rid, 300_000, 2_000);
+    process.stderr.write('Wallet approved.\n');
+
+    // Prompt for 6-digit code (retry up to 3 times)
+    let payload;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const code = await promptCode();
+      const codeHashHex = bytesToHex(computeCodeHash(rid, code));
+      try {
+        const encrypted = await relay.retrieve(rid, codeHashHex);
+        payload = decryptSession(encrypted, cliSk, code, rid);
+        break;
+      } catch (e) {
+        if (e instanceof RelayCodeError && e.attemptsRemaining > 0) {
+          process.stderr.write(`${e.message}\n`);
+          continue;
+        }
+        throw e;
+      }
+    }
+    if (!payload) throw new Error('Failed to decrypt session after 3 attempts');
+
+    const session = sessionPayloadToWalletSession(payload);
+    await saveWalletSession(name, session);
 
     console.log(
       JSON.stringify(
         {
           ok: true,
           walletName: name,
-          walletAddress,
-          chainId,
-          chain: resolvedChain,
+          walletAddress: session.walletAddress,
+          chainId: session.chainId,
+          chain: session.chain,
           message: 'Session started successfully. Wallet ready for operations.'
         },
         null,
@@ -677,11 +408,7 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
   } catch (error) {
     console.error(
       JSON.stringify(
-        {
-          ok: false,
-          error: (error as Error).message,
-          stack: (error as Error).stack
-        },
+        { ok: false, error: (error as Error).message, stack: (error as Error).stack },
         null,
         2
       )
@@ -693,19 +420,85 @@ h2{margin:0 0 .5rem;font-size:1.25rem;color:#22c55e}p{margin:0;font-size:.875rem
 // --- Subcommand: wallet import (alias: start-session) ---
 interface ImportArgs {
   name: string;
-  ciphertext: string;
+  ciphertext?: string;
   rid?: string;
+  code?: string;
 }
 
 async function handleImport(argv: ImportArgs): Promise<void> {
   const name = argv.name;
-  const ciphertext = fileCoerce(argv.ciphertext);
-  let rid = argv.rid;
 
   try {
+    // Relay-based code import
+    if (argv.code) {
+      const code = argv.code.trim();
+      let rid = argv.rid;
+
+      if (!rid) {
+        // Find the most recent v2 request for this wallet
+        const requestFiles = fs
+          .readdirSync(path.join(os.homedir(), '.polygon-agent', 'requests'))
+          .filter((f) => f.endsWith('.json'))
+          .sort()
+          .reverse();
+
+        for (const file of requestFiles) {
+          const requestRid = file.replace('.json', '');
+          const request = await loadWalletRequest(requestRid);
+          if (request && request.walletName === name && request.cliSkHex) {
+            rid = requestRid;
+            break;
+          }
+        }
+        if (!rid)
+          throw new Error(
+            `No pending relay request for wallet '${name}'. Run: polygon-agent wallet create --no-wait`
+          );
+      }
+
+      const request = await loadWalletRequest(rid!);
+      if (!request?.cliSkHex) throw new Error(`Request ${rid} is not a relay-based request`);
+
+      const connectorBase = (
+        process.env.SEQUENCE_ECOSYSTEM_CONNECTOR_URL || 'https://agentconnect.polygon.technology'
+      ).replace(/\/$/, '');
+
+      const relay = new RelayClient(connectorBase);
+      const cliSk = hexToBytes(request.cliSkHex);
+      const codeHashHex = bytesToHex(computeCodeHash(rid!, code));
+      const encrypted = await relay.retrieve(rid!, codeHashHex);
+      const payload = decryptSession(encrypted, cliSk, code, rid!);
+
+      const session = sessionPayloadToWalletSession(payload);
+      await saveWalletSession(name, session);
+
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            walletName: name,
+            walletAddress: session.walletAddress,
+            chainId: session.chainId,
+            chain: session.chain,
+            message: 'Session started successfully. Wallet ready for operations.'
+          },
+          null,
+          2
+        )
+      );
+      return;
+    }
+
+    // Legacy ciphertext-based import (backward compat)
+    if (!argv.ciphertext) {
+      throw new Error('Provide either --code (relay mode) or --ciphertext (legacy mode)');
+    }
+    const ciphertext = fileCoerce(argv.ciphertext);
+    let rid = argv.rid;
+
     if (!rid) {
       const requestFiles = fs
-        .readdirSync(`${process.env.HOME}/.polygon-agent/requests`)
+        .readdirSync(path.join(os.homedir(), '.polygon-agent', 'requests'))
         .filter((f) => f.endsWith('.json'));
 
       for (const file of requestFiles) {
@@ -716,12 +509,7 @@ async function handleImport(argv: ImportArgs): Promise<void> {
           break;
         }
       }
-
-      if (!rid) {
-        throw new Error(
-          `No matching request found for wallet '${name}'. Available: ${requestFiles.join(', ')}`
-        );
-      }
+      if (!rid) throw new Error(`No matching request found for wallet '${name}'`);
     }
 
     const { walletAddress, chainId, chain } = await decryptAndSaveSession(name, ciphertext, rid);
@@ -743,11 +531,7 @@ async function handleImport(argv: ImportArgs): Promise<void> {
   } catch (error) {
     console.error(
       JSON.stringify(
-        {
-          ok: false,
-          error: (error as Error).message,
-          stack: (error as Error).stack
-        },
+        { ok: false, error: (error as Error).message, stack: (error as Error).stack },
         null,
         2
       )
@@ -912,14 +696,14 @@ export const walletCommand: CommandModule = {
               .option('timeout', {
                 type: 'number',
                 default: 300,
-                describe: 'Seconds to wait for callback before timing out'
+                describe: 'Seconds to wait for approval before timing out'
               })
           ),
         handler: (argv) => handleCreate(argv as unknown as CreateArgs)
       })
       .command({
         command: 'import',
-        describe: 'Import session from ciphertext',
+        describe: 'Import session from relay code or legacy ciphertext',
         builder: (y) =>
           y
             .option('name', {
@@ -927,11 +711,13 @@ export const walletCommand: CommandModule = {
               default: 'main',
               describe: 'Wallet name'
             })
+            .option('code', {
+              type: 'string',
+              describe: '6-digit code from browser (for relay-based sessions)'
+            })
             .option('ciphertext', {
               type: 'string',
-              demandOption: true,
-              describe: 'Encrypted session blob',
-              coerce: fileCoerce
+              describe: 'Encrypted blob (legacy mode, or use @file)'
             })
             .option('rid', {
               type: 'string',
@@ -949,11 +735,13 @@ export const walletCommand: CommandModule = {
               default: 'main',
               describe: 'Wallet name'
             })
+            .option('code', {
+              type: 'string',
+              describe: '6-digit code from browser (for relay-based sessions)'
+            })
             .option('ciphertext', {
               type: 'string',
-              demandOption: true,
-              describe: 'Encrypted session blob',
-              coerce: fileCoerce
+              describe: 'Encrypted session blob'
             })
             .option('rid', {
               type: 'string',
