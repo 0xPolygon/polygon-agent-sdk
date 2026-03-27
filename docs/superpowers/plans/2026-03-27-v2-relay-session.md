@@ -188,7 +188,7 @@ export function b64urlDecode(str: string): Uint8Array {
 
 ```typescript
 // packages/shared/src/crypto.ts
-import { x25519 } from '@noble/curves/x25519';
+import { x25519 } from '@noble/curves/ed25519';
 import { hkdf } from '@noble/hashes/hkdf';
 import { sha256 } from '@noble/hashes/sha2';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha';
@@ -393,7 +393,7 @@ pnpm install
 cd packages/shared && pnpm test
 ```
 
-Expected: FAIL — `Cannot find module '@noble/curves/x25519'` or similar (deps not installed yet). If `pnpm install` ran, it should FAIL with test errors, not module-not-found errors.
+Expected: FAIL — `Cannot find module '@noble/curves/ed25519'` or similar (deps not installed yet). If `pnpm install` ran, it should FAIL with test errors, not module-not-found errors.
 
 After `pnpm install`, run again:
 

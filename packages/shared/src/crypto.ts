@@ -30,6 +30,7 @@ export function generateCode(): string {
 
 /** SHA-256(requestId + code). Used as the code_hash sent to the relay. */
 export function computeCodeHash(requestId: string, code: string): Uint8Array {
+  if (!requestId) throw new Error('requestId must not be empty');
   return sha256(new TextEncoder().encode(requestId + code));
 }
 
@@ -88,6 +89,7 @@ export function decryptSession(
   code: string,
   requestId: string
 ): SessionPayload {
+  if (!requestId) throw new Error('requestId must not be empty');
   const cliPk = x25519.getPublicKey(cliSk);
   const walletPk = hexToBytes(encrypted.wallet_pk_hex);
   const shared = x25519.getSharedSecret(cliSk, walletPk);
