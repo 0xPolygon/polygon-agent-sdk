@@ -43,31 +43,33 @@ export SEQUENCE_PROJECT_ACCESS_KEY=<override-key>
 ## Complete Setup Flow
 
 ```bash
-# Phase 1: Setup (creates EOA + Sequence project, stores access key to disk)
+# Step 1: Setup (creates EOA + Sequence project, stores access key to disk)
 polygon-agent setup --name "MyAgent"
 # → saves privateKey (not shown again), eoaAddress, accessKey to ~/.polygon-agent/builder.json
 # → all subsequent commands auto-load the access key from disk — no export needed
 
-# Phase 2: Create ecosystem wallet (opens browser, waits for 6-digit code)
+# Step 2: Create ecosystem wallet (opens browser, waits for 6-digit code)
 polygon-agent wallet create --usdc-limit 100 --native-limit 5
 # → opens https://agentconnect.polygon.technology/link?rid=<rid>&...
 # → user approves in browser, browser shows a 6-digit code
 # → enter the 6-digit code in the terminal when prompted
 # → session saved to ~/.polygon-agent/wallets/main.json
 
-# Phase 3: Fund wallet
+# Step 3: Fund wallet
 polygon-agent fund
 # → reads walletAddress from session, builds Trails widget URL with toAddress=<walletAddress>
 # → ALWAYS run this command to get the URL — never construct it manually or hardcode any address
 # → send the returned `fundingUrl` to the user; `walletAddress` in the output confirms the recipient
 
-# Phase 4: Verify
+# Step 4: Verify balances
 polygon-agent balances
 
-# Phase 5: Register agent on-chain (ERC-8004, Polygon mainnet)
+# Step 5: Register agent on-chain (ERC-8004, Polygon mainnet only)
 polygon-agent agent register --name "MyAgent" --broadcast
-# → mints ERC-721 NFT, emits agentId in Registered event
-# → use agentId for reputation queries and feedback
+# → mints ERC-721 NFT, emits Registered event containing agentId
+# → retrieve agentId: open the tx on https://polygonscan.com, go to Logs tab,
+#   find the Registered event — agentId is the first indexed parameter
+# → use agentId for reputation queries, reviews, and feedback
 ```
 
 ## Commands Reference
@@ -78,6 +80,8 @@ polygon-agent setup --name <name> [--force]
 ```
 
 ### Wallet
+Valid `--chain` values: `polygon` (default/mainnet), `amoy` (Polygon testnet), `mainnet` (Ethereum), `arbitrum`, `optimism`, `base`. ERC-8004 agent operations only support `polygon`.
+
 ```bash
 polygon-agent wallet create [--name <n>] [--chain polygon] [--timeout <sec>] [--print-url]
   [--native-limit <amt>] [--usdc-limit <amt>] [--usdt-limit <amt>]
@@ -123,7 +127,7 @@ polygon-agent agent feedback --agent-id <id> --value <score> [--tag1 <t>] [--tag
 - **Smart defaults** — `--wallet main`, `--chain polygon`, auto-wait on `wallet create`
 - **Fee preference** — auto-selects USDC over native POL when both available
 - **`fund`** — reads `walletAddress` from the wallet session and sets it as `toAddress` in the Trails widget URL. Always run `polygon-agent fund` to get the correct URL — never construct it manually or hardcode any address.
-- **`deposit`** — picks highest-TVL pool via Trails `getEarnPools`. If session rejects, re-create wallet with `--contract <depositAddress>`
+- **`deposit`** — picks highest-TVL pool via Trails `getEarnPools`. If session rejects (contract not whitelisted), re-create wallet with `--contract <depositAddress>`
 - **`x402-pay`** — probes endpoint for 402, smart wallet funds builder EOA with exact token amount, EOA signs EIP-3009 payment. Chain auto-detected from 402 response
 - **`send-native --direct`** — bypasses ValueForwarder contract for direct EOA transfer
 - **Session permissions** — without `--usdc-limit` etc., session gets bare-bones defaults and may not transact
@@ -131,17 +135,9 @@ polygon-agent agent feedback --agent-id <id> --value <score> [--tag1 <t>] [--tag
 
 ## Wallet Creation Flow (v2 Relay)
 
-`wallet create` uses a Cloudflare Durable Object relay and a 6-digit out-of-band code — no cloudflared tunnel required:
+`wallet create` uses a Cloudflare Durable Object relay and a 6-digit out-of-band code — no cloudflared tunnel required. The browser encrypts the approved session with an X25519 key negotiated via the relay; the 6-digit code is the decryption key entered in the terminal.
 
-1. CLI registers its X25519 public key with the relay, gets a request ID (`rid`)
-2. CLI opens `https://agentconnect.polygon.technology/link?rid=<rid>&...` in the browser
-3. User approves the wallet session in the browser (Sequence popup)
-4. Browser encrypts the session with the CLI's public key and posts it to the relay
-5. Browser displays a **6-digit code**
-6. User enters the code in the terminal when prompted
-7. CLI fetches the encrypted payload from the relay, decrypts it using the code, saves the session
-
-**`--print-url` flow:** CLI outputs the URL without blocking. Complete later with:
+**`--print-url` flag:** Use this in headless or non-interactive environments (CI, remote shells) where `wallet create` can't block waiting for the code. The CLI prints the approval URL and exits immediately. Complete the flow separately:
 ```bash
 polygon-agent wallet import --code <6-digit-code> --rid <rid>
 ```
@@ -166,7 +162,9 @@ CLI commands output JSON (non-TTY). After running a command, always render the r
 | `deposit` | Summary: amount, asset, protocol, pool address. If broadcast, show tx hash + explorer link. |
 | `fund` | Show the `fundingUrl` as a clickable link with a brief instruction to open it. |
 | `wallet create` / `wallet list` | Wallet name, truncated address, chain in a small table or bullet list. |
-| `agent register` | Show agent name and tx hash. Remind user to retrieve `agentId` from the Registered event. |
+| `agent register` | Show agent name and tx hash as a code span with Polygonscan link. Remind user to retrieve `agentId` from the Registered event on the Logs tab. |
+| `agent wallet` | Show `agentId`, wallet address, and whether a wallet is set. |
+| `agent metadata` | Show `agentId`, key, and decoded value. |
 | `agent reputation` | Format score and tag breakdown as a small table. |
 
 **Dry-run results** — always make it visually clear this was a simulation. Prefix with `⚡ Dry run` and show what *would* happen. Remind the user to re-run with `--broadcast` to execute.
@@ -187,6 +185,9 @@ CLI commands output JSON (non-TTY). After running a command, always render the r
 | `Relay request not found` | Session expired or already used — re-run `wallet create` (or `wallet create --print-url`) |
 | Deposit session rejected | Re-create wallet with `--contract <depositAddress>` |
 | Wrong recipient in Trails widget | Run `polygon-agent fund` (do not construct the URL manually) |
+| `x402-pay`: no 402 response | Endpoint doesn't require x402 payment, or URL is wrong |
+| `x402-pay`: payment token mismatch | Chain/token in the 402 response differs from wallet — check `--wallet` points to the right chain |
+| `x402-pay`: EOA funding failed | Wallet lacks sufficient balance to cover the payment amount — run `balances` and fund if needed |
 
 ## File Structure
 ```
