@@ -171,6 +171,58 @@ CLI commands output JSON (non-TTY). After running a command, always render the r
 
 **Errors** — extract the `error` field and present it as a clear sentence, not a JSON blob. Include the relevant fix from the Troubleshooting table if applicable.
 
+## x402 Bazaar Services
+
+Pay-per-call APIs accessible via `x402-pay`. No API keys or subscriptions — each call costs a small USDC amount drawn from your wallet. The CLI detects the 402 response, funds the exact amount, and retries automatically.
+
+**Catalog:** `GET https://x402-api.onrender.com/api/catalog?status=online`
+
+### Read Twitter/X profiles & tweets
+$0.005 USDC per call.
+```bash
+# Profile + recent tweets
+polygon-agent x402-pay \
+  --url "https://x402-api.onrender.com/api/call/99063826-5171-47d1-8b96-56ab8a6e3ddb?user=<username>" \
+  --wallet main --method GET
+
+# Specific tweet
+polygon-agent x402-pay \
+  --url "https://x402-api.onrender.com/api/call/99063826-5171-47d1-8b96-56ab8a6e3ddb?tweet=https://x.com/user/status/<id>" \
+  --wallet main --method GET
+```
+Returns: follower count, recent tweets, engagement metrics.
+
+### Generate an AI image
+$0.02 USDC per call. Powered by Google Gemini.
+```bash
+polygon-agent x402-pay \
+  --url "https://x402-api.onrender.com/api/call/2998d205-94d9-4f7e-8f8a-201a090a5530?prompt=<description>&size=512" \
+  --wallet main --method GET
+```
+`size` options: `256`, `512`, `1024`. Returns JSON with `data_uri` (base64 PNG) for embedding.
+
+### Review code for bugs & security
+$0.01 USDC per call. Powered by GPT-4o.
+```bash
+polygon-agent x402-pay \
+  --url "https://x402-api.onrender.com/api/call/7f21e675-9fdc-4ba3-9a8d-145c6ac703c7" \
+  --wallet main \
+  --body '{"code": "<snippet>", "language": "<python|javascript|go|...>"}'
+```
+Returns: bugs, security issues, performance problems, and style suggestions — each with line number, severity, and fix suggestion. Plus an overall quality score.
+
+### Other useful services
+
+| Service | Price | Endpoint | Key param |
+|---------|-------|----------|-----------|
+| Web search (DuckDuckGo) | $0.005 | `9b0f5b5f-8e6c-4b55-a264-008e4e490c26` | `?q=<query>&max=10` |
+| Latest news (Google News) | $0.005 | `266d045f-bae2-4c71-9469-3638ec860fc4` | `?topic=<topic>&lang=en` |
+| Summarize text (GPT-4o-mini) | $0.01 | `dd9b5098-700d-47a9-a41a-c9eae66ca49d` | `?text=<text>&maxLength=200` |
+| Article → Markdown | $0.005 | `87b50238-5b99-4521-b5e1-7515a9c1526d` | `?url=<article-url>` |
+| Sentiment analysis (GPT-4o-mini) | $0.005 | `66d68ca6-a8d9-41a3-b024-a3fac2f5c7ba` | `?text=<text>` |
+
+All use GET via `polygon-agent x402-pay --url "https://x402-api.onrender.com/api/call/<id><params>" --wallet main --method GET`.
+
 ## Troubleshooting
 
 | Issue | Fix |
