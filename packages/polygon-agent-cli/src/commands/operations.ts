@@ -1239,7 +1239,18 @@ export const x402PayCommand: CommandModule = {
 
       const eoaAccount = privateKeyToAccount(builderConfig.privateKey as `0x${string}`);
 
-      const probe = await fetch(url, { method });
+      const probe = await fetch(url, {
+        method,
+        body: body || undefined,
+        headers: (() => {
+          const h: Record<string, string> = {};
+          for (const hdr of headerArgs) {
+            const idx = hdr.indexOf(':');
+            if (idx > 0) h[hdr.slice(0, idx).trim()] = hdr.slice(idx + 1).trim();
+          }
+          return Object.keys(h).length ? h : undefined;
+        })()
+      });
       if (probe.status !== 402) {
         const contentType = probe.headers.get('content-type') || '';
         const data = contentType.includes('application/json')
@@ -1249,6 +1260,90 @@ export const x402PayCommand: CommandModule = {
         return;
       }
 
+      const headers: Record<string, string> = {};
+      for (const h of headerArgs) {
+        const idx = h.indexOf(':');
+        if (idx > 0) headers[h.slice(0, idx).trim()] = h.slice(idx + 1).trim();
+      }
+
+      // Detect custom payment_details format (e.g. x402-api.onrender.com)
+      // vs standard x402 X-PAYMENT-REQUIRED header format.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let probeBody: any = null;
+      try {
+        probeBody = await probe.clone().json();
+      } catch {
+        // not JSON — fall through to standard x402
+      }
+
+      if (probeBody?.payment_details) {
+        // Custom format: send USDC on-chain, retry with X-Payment-TxHash header
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const details = probeBody.payment_details as any;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const networks: any[] = Array.isArray(details.networks) ? details.networks : [];
+        const polygonNet = networks.find(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (n: any) => n.network === 'polygon' || n.chainId === 137
+        );
+        if (!polygonNet) throw new Error('No Polygon payment option in 402 response');
+
+        const recipient = details.recipient as string;
+        const amountUsdc = details.amount as number;
+        const usdcContract = (polygonNet.usdc_contract ||
+          '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359') as string;
+        const amountUnits = BigInt(Math.round(amountUsdc * 1_000_000));
+
+        const pad = (hex: string, n = 64) => String(hex).replace(/^0x/, '').padStart(n, '0');
+        const transferData = '0xa9059cbb' + pad(recipient) + pad('0x' + amountUnits.toString(16));
+
+        process.stderr.write(`Sending ${amountUsdc} USDC to ${recipient} on Polygon...\n`);
+        const fundResult = await runDappClientTx({
+          walletName,
+          chainId: 137,
+          transactions: [{ to: usdcContract, value: 0n, data: transferData }],
+          broadcast: true,
+          preferNativeFee: true
+        });
+        process.stderr.write(`Paid via tx: ${fundResult.txHash}\n`);
+
+        const retryHeaders: Record<string, string> = {
+          ...headers,
+          'X-Payment-TxHash': fundResult.txHash!,
+          'X-Payment-Chain': 'polygon'
+        };
+        if (body) retryHeaders['Content-Type'] = 'application/json';
+
+        const response = await fetch(url, {
+          method,
+          headers: retryHeaders,
+          body: body || undefined
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        const data = contentType.includes('application/json')
+          ? await response.json()
+          : await response.text();
+
+        console.log(
+          JSON.stringify(
+            {
+              ok: response.ok,
+              status: response.status,
+              walletAddress: session.walletAddress,
+              funded: { amount: amountUsdc, asset: usdcContract, txHash: fundResult.txHash },
+              data
+            },
+            null,
+            2
+          )
+        );
+
+        if (!response.ok) process.exit(1);
+        return;
+      }
+
+      // Standard x402 flow: EIP-3009 signed payment via facilitator
       const httpClient = new x402HTTPClient(new x402Client());
       const paymentRequired = httpClient.getPaymentRequiredResponse(
         (n: string) => probe.headers.get(n),
@@ -1286,12 +1381,6 @@ export const x402PayCommand: CommandModule = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       client.register('eip155:*', new ExactEvmScheme(eoaAccount as any));
       const fetchWithPayment = wrapFetchWithPayment(fetch, client);
-
-      const headers: Record<string, string> = {};
-      for (const h of headerArgs) {
-        const idx = h.indexOf(':');
-        if (idx > 0) headers[h.slice(0, idx).trim()] = h.slice(idx + 1).trim();
-      }
 
       const response = await fetchWithPayment(url, {
         method,
