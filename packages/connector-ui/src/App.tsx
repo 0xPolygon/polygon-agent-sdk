@@ -512,6 +512,13 @@ function App() {
     const isWaiting = connecting || (walletAddress && !sessionCode);
     return (
       <div className="min-h-screen bg-[#eeeef5] flex flex-col items-center justify-center px-4">
+        {/* Fixed logo */}
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-2.5">
+          <img src="/polygon-logo-full.webp" alt="Polygon" className="h-8 w-auto" />
+          <span className="font-mono text-xs bg-[#0f0f1a] text-white px-2 py-0.5 rounded-md tracking-tight">
+            &gt;_ agent
+          </span>
+        </div>
         {/* Floating card */}
         <div
           className="w-full max-w-sm bg-white rounded-2xl border border-[#e5e5f0] overflow-hidden"
@@ -521,14 +528,6 @@ function App() {
           <div className="h-0.5 bg-gradient-to-r from-[#8247e5] via-[#a855f7] to-[#8247e5]" />
 
           <div className="px-8 py-10 flex flex-col items-center">
-            {/* Logo + badge */}
-            <div className="flex items-center gap-2.5 mb-8">
-              <img src="/polygon-logo-full.webp" alt="Polygon" className="h-7 w-auto" />
-              <span className="font-mono text-xs bg-[#0f0f1a] text-white px-2 py-0.5 rounded-md tracking-tight">
-                &gt;_ agent
-              </span>
-            </div>
-
             {/* CTA / status */}
             {isWaiting ? (
               <div className="flex items-center gap-2.5 text-sm text-[#6b7280]">
@@ -578,7 +577,7 @@ function App() {
   if (sessionCode && !showFunding && !showDashboard) {
     return (
       <div className="min-h-screen bg-[#eeeef5] flex flex-col items-center justify-center px-4">
-        <div className="flex items-center gap-2.5 mb-6">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-2.5">
           <img src="/polygon-logo-full.webp" alt="Polygon" className="h-8 w-auto" />
           <span className="font-mono text-xs bg-[#0f0f1a] text-white px-2 py-0.5 rounded-md tracking-tight">
             &gt;_ agent
