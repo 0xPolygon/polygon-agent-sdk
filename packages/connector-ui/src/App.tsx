@@ -800,11 +800,6 @@ function App() {
               title: 'Docs',
               desc: 'Full CLI reference, quickstart guide, and architecture docs to get your agent onchain fast.',
               href: 'https://polygon-labs.mintlify.io/wallets/agentic-wallets'
-            },
-            {
-              title: 'Services list',
-              desc: 'Explore the onchain services your agent can use: swaps, onramps, x402 payments, Polymarket, and more.',
-              href: 'https://github.com/0xPolygon/polygon-agent-cli'
             }
           ].map((card) => (
             <a
