@@ -71,21 +71,21 @@ const AGENTS: {
     id: 'claude',
     label: 'Claude',
     color: '#D97706',
-    terminalPrefix: '$ claude',
+    terminalPrefix: 'claude',
     buildCommand: (display) => `claude "Read ${SKILL_URL} and ${display}"`
   },
   {
     id: 'codex',
     label: 'Codex',
     color: '#10A37F',
-    terminalPrefix: '$ codex',
+    terminalPrefix: 'codex',
     buildCommand: (display) => `codex "Read ${SKILL_URL} and ${display}"`
   },
   {
     id: 'gemini',
     label: 'Gemini',
     color: '#4285F4',
-    terminalPrefix: '$ gemini',
+    terminalPrefix: 'gemini',
     buildCommand: (display) => `gemini "Read ${SKILL_URL} and ${display}"`
   }
 ];
