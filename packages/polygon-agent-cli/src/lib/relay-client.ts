@@ -12,11 +12,26 @@ export class RelayClient {
     this.baseUrl = baseUrl;
   }
 
+  private cfAccessHeaders(): Record<string, string> {
+    // Service token auth (CI / machine clients)
+    const id = process.env.CF_ACCESS_CLIENT_ID;
+    const secret = process.env.CF_ACCESS_CLIENT_SECRET;
+    if (id && secret) {
+      return { 'CF-Access-Client-Id': id, 'CF-Access-Client-Secret': secret };
+    }
+    // User JWT from `cloudflared access token --app <url>`
+    const token = process.env.CF_ACCESS_TOKEN;
+    if (token) {
+      return { 'CF-Access-Token': token };
+    }
+    return {};
+  }
+
   /** Register CLI public key with relay. Returns request_id. */
   async createRequest(cliPkHex: string): Promise<string> {
     const res = await fetch(`${this.baseUrl}/api/relay/request`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...this.cfAccessHeaders() },
       body: JSON.stringify({ cli_pk_hex: cliPkHex })
     });
     if (!res.ok) {
@@ -36,7 +51,9 @@ export class RelayClient {
   ): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const res = await fetch(`${this.baseUrl}/api/relay/status/${requestId}`);
+      const res = await fetch(`${this.baseUrl}/api/relay/status/${requestId}`, {
+        headers: this.cfAccessHeaders()
+      });
       if (res.status === 404) throw new Error('Relay request not found (expired or invalid)');
       if (!res.ok) throw new Error(`Relay status check failed (${res.status})`);
       const data = (await res.json()) as RelayStatusResponse;
@@ -51,7 +68,7 @@ export class RelayClient {
   async retrieve(requestId: string, codeHashHex: string): Promise<EncryptedPayload> {
     const res = await fetch(`${this.baseUrl}/api/relay/retrieve/${requestId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...this.cfAccessHeaders() },
       body: JSON.stringify({ code_hash_hex: codeHashHex })
     });
 
