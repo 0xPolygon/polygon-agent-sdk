@@ -85,9 +85,11 @@ export function CodeDisplay({ code, walletAddress, totalUsd, onRegenerate }: Cod
       </div>
 
       {/* Footer */}
-      <div className="border-t border-[#c8cfe1] px-6 py-3 flex items-center justify-center gap-1.5">
-        <span className="text-xs text-[#929eba] font-medium">Powered by</span>
+      <div className="border-t border-[#c8cfe1] px-6 py-3 flex items-center justify-center gap-2">
         <img src="/polygon-logo-full.webp" alt="Polygon" className="h-3.5 w-auto opacity-40" />
+        <span className="font-mono text-xs bg-[#141635] text-white px-2 py-0.5 rounded-md tracking-tight">
+          &gt;_ agent
+        </span>
       </div>
     </div>
   );

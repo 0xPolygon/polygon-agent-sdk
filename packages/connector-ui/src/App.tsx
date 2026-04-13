@@ -518,7 +518,12 @@ function App() {
         >
           {/* Header */}
           <div className="px-8 pt-8 pb-6 flex flex-col items-center gap-5">
-            <img src="/polygon-logo-full.webp" alt="Polygon" className="h-8 w-auto" />
+            <div className="flex items-center gap-2.5">
+              <img src="/polygon-logo-full.webp" alt="Polygon" className="h-8 w-auto" />
+              <span className="font-mono text-xs bg-[#141635] text-white px-2 py-0.5 rounded-md tracking-tight">
+                &gt;_ agent
+              </span>
+            </div>
             <div className="text-center">
               <h1 className="text-lg font-bold text-[#141635] mb-1">Connect your agent wallet</h1>
               <p className="text-sm text-[#64708f] leading-relaxed">
@@ -617,6 +622,9 @@ function App() {
       <nav className="bg-white border-b border-[#c8cfe1] px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img src="/polygon-logo-full.webp" alt="Polygon" className="h-7 w-auto" />
+          <span className="font-mono text-xs bg-[#141635] text-white px-2 py-0.5 rounded-md tracking-tight">
+            &gt;_ agent
+          </span>
         </div>
         <a
           href="https://wallet.polygon.technology"
