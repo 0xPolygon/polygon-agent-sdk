@@ -201,15 +201,14 @@ polygon-agent x402-pay \
 ```
 `size` options: `256`, `512`, `1024`. Returns JSON with `data_uri` (base64 PNG) for embedding.
 
-### Review code for bugs & security
-$0.01 USDC per call. Powered by GPT-4o.
+### Score a sales lead
+$0.01 USDC per call.
 ```bash
 polygon-agent x402-pay \
-  --url "https://x402-api.onrender.com/api/call/7f21e675-9fdc-4ba3-9a8d-145c6ac703c7" \
-  --wallet main --method POST \
-  --body '{"code": "<snippet>", "language": "<python|javascript|go|...>"}'
+  --url "https://x402-api.onrender.com/api/call/31bf0100-2674-4706-a3d4-fc631d44c649?domain=<domain>" \
+  --wallet main --method POST
 ```
-Returns: bugs, security issues, performance problems, and style suggestions — each with line number, severity, and fix suggestion. Plus an overall quality score.
+Returns: 0–100 score, A–F grade, and 7 signal breakdown: domain age, email setup (MX records), SSL health, DNS configuration, GitHub presence, and tech stack.
 
 ### Other useful services
 
