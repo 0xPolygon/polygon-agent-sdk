@@ -11,57 +11,57 @@ interface FundingScreenProps {
 const USDC_POLYGON = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
 
 const trailsTheme: Record<string, string> = {
-  '--trails-font-family': 'ui-sans-serif, system-ui, sans-serif',
+  '--trails-font-family': "'Fustat', 'Inter', ui-sans-serif, system-ui, sans-serif",
 
-  '--trails-border-radius-widget': '16px',
+  '--trails-border-radius-widget': '24px',
   '--trails-border-radius-button': '12px',
   '--trails-border-radius-input': '12px',
-  '--trails-border-radius-dropdown': '12px',
-  '--trails-border-radius-container': '12px',
-  '--trails-border-radius-list': '12px',
+  '--trails-border-radius-dropdown': '16px',
+  '--trails-border-radius-container': '16px',
+  '--trails-border-radius-list': '16px',
 
-  '--trails-widget-border': '1px solid #e5e5f0',
-  '--trails-shadow': '0 4px 24px rgba(130,71,229,0.08)',
+  '--trails-widget-border': '1px solid #c8cfe1',
+  '--trails-shadow': '0 2px 8px rgba(20,22,53,0.06)',
 
-  '--trails-primary': '#8247e5',
-  '--trails-primary-hover': '#7139d4',
-  '--trails-primary-disabled': '#c4b4f5',
+  '--trails-primary': '#141635',
+  '--trails-primary-hover': '#1e2155',
+  '--trails-primary-disabled': '#929eba',
   '--trails-primary-disabled-text': 'rgba(255,255,255,0.5)',
 
   '--trails-bg-primary': '#ffffff',
-  '--trails-bg-secondary': '#f3f4f8',
-  '--trails-bg-tertiary': '#eeeef5',
+  '--trails-bg-secondary': '#f5f6fb',
+  '--trails-bg-tertiary': '#eef0f8',
   '--trails-bg-card': '#ffffff',
 
-  '--trails-text-primary': '#0f0f1a',
-  '--trails-text-secondary': '#374151',
-  '--trails-text-tertiary': '#6b7280',
-  '--trails-text-muted': '#9ca3af',
+  '--trails-text-primary': '#141635',
+  '--trails-text-secondary': '#64708f',
+  '--trails-text-tertiary': '#64708f',
+  '--trails-text-muted': '#929eba',
 
-  '--trails-border-primary': '#e5e5f0',
-  '--trails-border-secondary': '#e5e5f0',
-  '--trails-border-tertiary': '#f0f0f5',
+  '--trails-border-primary': '#c8cfe1',
+  '--trails-border-secondary': '#c8cfe1',
+  '--trails-border-tertiary': '#eef0f8',
 
-  '--trails-hover-bg': '#f3f4f8',
-  '--trails-focus-ring': 'rgba(130,71,229,0.2)',
+  '--trails-hover-bg': '#f5f6fb',
+  '--trails-focus-ring': 'rgba(124,58,237,0.15)',
 
-  '--trails-input-bg': '#f3f4f8',
-  '--trails-input-border': '#e5e5f0',
-  '--trails-input-text': '#0f0f1a',
-  '--trails-input-placeholder': '#9ca3af',
-  '--trails-input-focus-border': '#8247e5',
-  '--trails-input-focus-ring': 'rgba(130,71,229,0.15)',
+  '--trails-input-bg': '#f5f6fb',
+  '--trails-input-border': '#c8cfe1',
+  '--trails-input-text': '#141635',
+  '--trails-input-placeholder': '#929eba',
+  '--trails-input-focus-border': '#7c3aed',
+  '--trails-input-focus-ring': 'rgba(124,58,237,0.12)',
 
   '--trails-dropdown-bg': '#ffffff',
-  '--trails-dropdown-border': '#e5e5f0',
-  '--trails-dropdown-text': '#374151',
-  '--trails-dropdown-hover-bg': '#f3f4f8',
-  '--trails-dropdown-selected-bg': '#f3f4f8',
-  '--trails-dropdown-selected-text': '#0f0f1a',
+  '--trails-dropdown-border': '#c8cfe1',
+  '--trails-dropdown-text': '#141635',
+  '--trails-dropdown-hover-bg': '#f5f6fb',
+  '--trails-dropdown-selected-bg': '#f5f6fb',
+  '--trails-dropdown-selected-text': '#141635',
 
   '--trails-list-bg': '#ffffff',
-  '--trails-list-border': '#e5e5f0',
-  '--trails-list-hover-bg': '#f9f9fc'
+  '--trails-list-border': '#c8cfe1',
+  '--trails-list-hover-bg': '#f5f6fb'
 };
 
 export function FundingScreen({ walletAddress, chainId, onSkip }: FundingScreenProps) {
@@ -69,19 +69,16 @@ export function FundingScreen({ walletAddress, chainId, onSkip }: FundingScreenP
     <div className="w-full max-w-sm animate-scale-in">
       {/* Card */}
       <div
-        className="w-full bg-white rounded-2xl border border-[#e5e5f0] overflow-hidden"
-        style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.04), 0 12px 40px rgba(130,71,229,0.09)' }}
+        className="w-full bg-white rounded-3xl border border-[#c8cfe1] overflow-hidden"
+        style={{ boxShadow: '0 2px 8px rgba(20,22,53,0.06), 0 16px 48px rgba(20,22,53,0.08)' }}
       >
-        {/* Purple hairline */}
-        <div className="h-0.5 bg-gradient-to-r from-[#8247e5] via-[#a855f7] to-[#8247e5]" />
-
         <div className="px-6 pt-7 pb-6 flex flex-col gap-5">
           {/* Headline + subtext */}
           <div>
-            <h2 className="text-[#0f0f1a] font-semibold text-base leading-snug mb-1">
+            <h2 className="text-[#141635] font-bold text-lg leading-snug mb-1">
               Fund your agent wallet
             </h2>
-            <p className="text-[#6b7280] text-sm leading-relaxed">
+            <p className="text-[#64708f] text-sm font-medium leading-relaxed">
               Deposit funds with a wallet, credit card, or exchange to access paid services.
             </p>
           </div>
@@ -111,7 +108,7 @@ export function FundingScreen({ walletAddress, chainId, onSkip }: FundingScreenP
 
       <button
         onClick={onSkip}
-        className="mt-4 w-full text-sm text-[#9ca3af] hover:text-[#6b7280] transition-colors cursor-pointer border-0 bg-transparent py-1"
+        className="mt-4 w-full text-sm text-[#929eba] hover:text-[#64708f] font-medium transition-colors cursor-pointer border-0 bg-transparent py-1"
       >
         Skip for now
       </button>
