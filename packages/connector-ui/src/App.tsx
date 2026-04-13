@@ -512,24 +512,22 @@ function App() {
     const isWaiting = connecting || (walletAddress && !sessionCode);
     return (
       <div className="min-h-screen bg-[#f5f6fb] flex flex-col items-center justify-center px-4">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-2.5">
+          <img src="/polygon-logo-full.webp" alt="Polygon" className="h-8 w-auto" />
+          <span className="font-mono text-xs bg-[#141635] text-white px-2 py-0.5 rounded-md tracking-tight">
+            &gt;_ agent
+          </span>
+        </div>
         <div
           className="w-full max-w-sm bg-white rounded-3xl border border-[#c8cfe1] overflow-hidden"
           style={{ boxShadow: '0 2px 8px rgba(20,22,53,0.06), 0 16px 48px rgba(20,22,53,0.08)' }}
         >
           {/* Header */}
-          <div className="px-8 pt-8 pb-6 flex flex-col items-center gap-5">
-            <div className="flex items-center gap-2.5">
-              <img src="/polygon-logo-full.webp" alt="Polygon" className="h-8 w-auto" />
-              <span className="font-mono text-xs bg-[#141635] text-white px-2 py-0.5 rounded-md tracking-tight">
-                &gt;_ agent
-              </span>
-            </div>
-            <div className="text-center">
-              <h1 className="text-lg font-bold text-[#141635] mb-1">Connect your agent wallet</h1>
-              <p className="text-sm text-[#64708f] leading-relaxed">
-                Create a secure session to authorize on-chain operations
-              </p>
-            </div>
+          <div className="px-8 pt-8 pb-6 flex flex-col items-center gap-3 text-center">
+            <h1 className="text-lg font-bold text-[#141635]">Connect your agent wallet</h1>
+            <p className="text-sm text-[#64708f] leading-relaxed">
+              Create a secure session to authorize onchain operations
+            </p>
           </div>
 
           <div className="px-8 pb-8 flex flex-col items-center gap-4">
@@ -580,6 +578,12 @@ function App() {
   if (sessionCode && !showFunding && !showDashboard) {
     return (
       <div className="min-h-screen bg-[#f5f6fb] flex flex-col items-center justify-center px-4">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-2.5">
+          <img src="/polygon-logo-full.webp" alt="Polygon" className="h-8 w-auto" />
+          <span className="font-mono text-xs bg-[#141635] text-white px-2 py-0.5 rounded-md tracking-tight">
+            &gt;_ agent
+          </span>
+        </div>
         <CodeDisplay
           code={sessionCode}
           walletAddress={walletAddress}
@@ -598,6 +602,12 @@ function App() {
   if (showFunding && !showDashboard) {
     return (
       <div className="min-h-screen bg-[#f5f6fb] flex flex-col items-center justify-center px-4">
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-2.5">
+          <img src="/polygon-logo-full.webp" alt="Polygon" className="h-8 w-auto" />
+          <span className="font-mono text-xs bg-[#141635] text-white px-2 py-0.5 rounded-md tracking-tight">
+            &gt;_ agent
+          </span>
+        </div>
         <div className="w-full max-w-sm">
           <FundingScreen
             walletAddress={walletAddress}
