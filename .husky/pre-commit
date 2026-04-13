@@ -1,30 +1,48 @@
 # =============================================================================
 # SKILL.md sync
 #
-# skills/SKILL.md is the single source of truth for the agent skill definition.
-# It must be kept in sync with two other locations:
+# skills/ is the single source of truth for all agent skill definitions.
+# The entire directory is synced to two locations on every commit:
 #
-#   packages/connector-ui/public/SKILL.md
-#     Served at https://agentconnect.polygon.technology/SKILL.md — this is the
-#     URL that agents fetch at runtime (referenced in the dashboard's use-case
-#     commands as SKILL_URL). Must match the root exactly.
+#   packages/connector-ui/public/skills/
+#     Served at https://agentconnect.polygon.technology/skills/ — agents fetch
+#     skill files at runtime from this URL.
 #
-#   packages/polygon-agent-cli/skills/SKILL.md
-#     Bundled inside the published npm package so the skill is available
-#     locally after install. The `name` field is rewritten from
+#   packages/polygon-agent-cli/skills/
+#     Bundled inside the published npm package so skills are available
+#     locally after install. The `name` field in SKILL.md is rewritten from
 #     `polygon-agent-kit` (monorepo name) to `polygon-agent-cli` (the
 #     installed skill identifier) to match what Claude Code registers.
 #
 # DO NOT edit the package copies directly — they will be overwritten.
-# Always edit skills/SKILL.md at the repo root.
+# Always edit files under skills/ at the repo root.
 # =============================================================================
 node -e "
 const fs = require('fs');
-const src = fs.readFileSync('skills/SKILL.md', 'utf8');
-fs.writeFileSync('packages/connector-ui/public/SKILL.md', src);
-fs.writeFileSync('packages/polygon-agent-cli/skills/SKILL.md', src.replace('name: polygon-agent-kit', 'name: polygon-agent-cli'));
+const path = require('path');
+
+function copyDir(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDir(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+// Sync to connector-ui (verbatim)
+copyDir('skills', 'packages/connector-ui/public/skills');
+
+// Sync to CLI package (rewrite name field in root SKILL.md only)
+copyDir('skills', 'packages/polygon-agent-cli/skills');
+const cliSkill = path.join('packages/polygon-agent-cli/skills/SKILL.md');
+fs.writeFileSync(cliSkill, fs.readFileSync(cliSkill, 'utf8').replace('name: polygon-agent-kit', 'name: polygon-agent-cli'));
 "
-git add packages/connector-ui/public/SKILL.md packages/polygon-agent-cli/skills/SKILL.md
+git add packages/connector-ui/public/skills packages/polygon-agent-cli/skills
 
 pnpm exec lint-staged
 pnpm run typecheck
