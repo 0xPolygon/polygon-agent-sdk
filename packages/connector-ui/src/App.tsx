@@ -9,7 +9,7 @@ import {
   Plus,
   Twitter,
   Sparkles,
-  Code2,
+  Target,
   ArrowLeftRight,
   TrendingUp
 } from 'lucide-react';
@@ -94,20 +94,20 @@ const USE_CASES: { label: string; display: string; icon: ElementType }[] = [
   {
     label: 'Read Twitter/X profiles & tweets',
     display:
-      'Read Twitter/X profiles and tweets without API keys. Get follower counts, recent tweets, engagement metrics.',
+      'Use x402 to read a Twitter/X profile and recent tweets. Get follower counts, recent tweets, and engagement metrics.',
     icon: Twitter
   },
   {
     label: 'Generate an AI image',
     display:
-      'Describe any scene or concept and generate a high-quality image using Google Gemini AI. Pay per generation via x402 — no API key or subscription needed.',
+      'Describe any scene or concept and generate a high-quality image using Google Gemini AI. Pay per generation via x402.',
     icon: Sparkles
   },
   {
-    label: 'Review code for bugs & security',
+    label: 'Score a sales lead',
     display:
-      'Submit any code snippet and get a structured GPT-4o review: bugs, security vulnerabilities, performance issues, and style suggestions — each with line numbers and severity ratings.',
-    icon: Code2
+      'Use x402 to score any company domain as a B2B sales lead. Get a 0–100 score and A–F grade from 7 signals: domain age, email setup (MX records), SSL health, DNS configuration, GitHub presence, and tech stack.',
+    icon: Target
   },
   {
     label: 'Bridge assets cross-chain',
@@ -118,7 +118,7 @@ const USE_CASES: { label: string; display: string; icon: ElementType }[] = [
   {
     label: 'Automate yield strategies',
     display:
-      'Find the highest-yield USDC lending pool on Polygon with TVL above $10M. Deposit some USDC and report the current APY.',
+      'Deposit USDC into the highest-TVL lending vault on Polygon or Katana with TVL above $100M and report the APY and pool address. Then set up a daily cron job to automatically re-evaluate and deposit into the best vault each morning.',
     icon: TrendingUp
   }
 ];

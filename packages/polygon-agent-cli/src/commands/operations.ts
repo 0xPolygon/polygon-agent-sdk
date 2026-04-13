@@ -1276,41 +1276,108 @@ export const x402PayCommand: CommandModule = {
         // not JSON — fall through to standard x402
       }
 
-      if (probeBody?.payment_details) {
-        // Custom format: send USDC on-chain, retry with X-Payment-TxHash header
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const details = probeBody.payment_details as any;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const networks: any[] = Array.isArray(details.networks) ? details.networks : [];
-        const polygonNet = networks.find(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (n: any) => n.network === 'polygon' || n.chainId === 137
-        );
-        if (!polygonNet) throw new Error('No Polygon payment option in 402 response');
-
-        const recipient = details.recipient as string;
-        const amountUsdc = details.amount as number;
-        const usdcContract = (polygonNet.usdc_contract ||
-          '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359') as string;
-        const amountUnits = BigInt(Math.round(amountUsdc * 1_000_000));
-
+      // x402 Bazaar payment format — specific to x402-api.onrender.com.
+      // Not a general x402 standard; do not apply to other endpoints.
+      const isX402Bazaar = new URL(url).hostname === 'x402-api.onrender.com';
+      if (isX402Bazaar && (probeBody?.payment_address || probeBody?.payment_details)) {
         const pad = (hex: string, n = 64) => String(hex).replace(/^0x/, '').padStart(n, '0');
-        const transferData = '0xa9059cbb' + pad(recipient) + pad('0x' + amountUnits.toString(16));
+        let payChain: string;
+        let payChainId: number;
+        let payRecipient: string;
+        let amountUsdc: number;
+        let usdcContract: string;
 
-        process.stderr.write(`Sending ${amountUsdc} USDC to ${recipient} on Polygon...\n`);
+        if (probeBody.payment_address) {
+          // Current x402 Bazaar format
+          const supportedChains: { chain: string; chainId: number }[] = Array.isArray(
+            probeBody.supported_chains
+          )
+            ? probeBody.supported_chains
+            : [];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const usdcContracts: Record<string, string> = (probeBody.usdc_contracts as any) || {};
+          const polygonEntry = supportedChains.find(
+            (c) => c.chain === 'polygon' || c.chainId === 137
+          );
+          if (polygonEntry) {
+            payChain = 'polygon';
+            payChainId = 137;
+            usdcContract = usdcContracts['polygon'] || '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
+          } else if (supportedChains.length > 0) {
+            const first = supportedChains[0];
+            payChain = first.chain;
+            payChainId = first.chainId;
+            usdcContract = usdcContracts[first.chain] || '';
+            if (!usdcContract) throw new Error(`No USDC contract known for chain ${payChain}`);
+          } else {
+            throw new Error('No supported chains in 402 response');
+          }
+          payRecipient = probeBody.payment_address as string;
+          amountUsdc = probeBody.amount_usdc as number;
+        } else {
+          // Legacy payment_details format
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const details = probeBody.payment_details as any;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const networks: any[] = Array.isArray(details.networks) ? details.networks : [];
+
+          const polygonNet = networks.find(
+            (n: any) => n.network === 'polygon' || n.chainId === 137
+          );
+          if (!polygonNet) throw new Error('No Polygon payment option in 402 response');
+          payChain = 'polygon';
+          payChainId = 137;
+          payRecipient = (polygonNet.recipient || details.recipient) as string;
+          amountUsdc = details.amount as number;
+          usdcContract = polygonNet.usdc_contract || '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
+        }
+
+        const amountUnits = BigInt(Math.round(amountUsdc * 1_000_000));
+        const transferData =
+          '0xa9059cbb' + pad(payRecipient) + pad('0x' + amountUnits.toString(16));
+
+        process.stderr.write(`Sending ${amountUsdc} USDC to ${payRecipient} on ${payChain}...\n`);
         const fundResult = await runDappClientTx({
           walletName,
-          chainId: 137,
+          chainId: payChainId,
           transactions: [{ to: usdcContract, value: 0n, data: transferData }],
-          broadcast: true,
-          preferNativeFee: true
+          broadcast: true
         });
-        process.stderr.write(`Paid via tx: ${fundResult.txHash}\n`);
+        const payTxHash = fundResult.txHash!;
+        process.stderr.write(`Paid via tx: ${payTxHash}\n`);
+
+        // Wait for the transaction to be confirmed before presenting to the server
+        process.stderr.write('Waiting for confirmation...\n');
+        const rpcUrl =
+          process.env.SEQUENCE_NODES_URL?.replace('{network}', payChain) ||
+          `https://nodes.sequence.app/${payChain}/${session.projectAccessKey || process.env.SEQUENCE_PROJECT_ACCESS_KEY || ''}`;
+        for (let attempt = 0; attempt < 30; attempt++) {
+          await new Promise((r) => setTimeout(r, 3000));
+          try {
+            const rpcRes = await fetch(rpcUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'eth_getTransactionReceipt',
+                params: [payTxHash]
+              })
+            });
+            const rpcData = (await rpcRes.json()) as { result?: { status?: string } | null };
+            if (rpcData.result?.status === '0x1') {
+              process.stderr.write('Transaction confirmed.\n');
+              break;
+            }
+          } catch {
+            // ignore RPC errors, keep polling
+          }
+        }
 
         const retryHeaders: Record<string, string> = {
           ...headers,
-          'X-Payment-TxHash': fundResult.txHash!,
-          'X-Payment-Chain': 'polygon'
+          'X-Payment-TxHash': payTxHash,
+          'X-Payment-Chain': payChain
         };
         if (body) retryHeaders['Content-Type'] = 'application/json';
 
@@ -1331,7 +1398,7 @@ export const x402PayCommand: CommandModule = {
               ok: response.ok,
               status: response.status,
               walletAddress: session.walletAddress,
-              funded: { amount: amountUsdc, asset: usdcContract, txHash: fundResult.txHash },
+              funded: { amount: amountUsdc, asset: usdcContract, txHash: payTxHash },
               data
             },
             null,
