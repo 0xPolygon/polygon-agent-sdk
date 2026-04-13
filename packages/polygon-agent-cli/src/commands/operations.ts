@@ -1319,14 +1319,14 @@ export const x402PayCommand: CommandModule = {
           const details = probeBody.payment_details as any;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const networks: any[] = Array.isArray(details.networks) ? details.networks : [];
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
           const polygonNet = networks.find(
             (n: any) => n.network === 'polygon' || n.chainId === 137
           );
           if (!polygonNet) throw new Error('No Polygon payment option in 402 response');
           payChain = 'polygon';
           payChainId = 137;
-          payRecipient = details.recipient as string;
+          payRecipient = (polygonNet.recipient || details.recipient) as string;
           amountUsdc = details.amount as number;
           usdcContract = polygonNet.usdc_contract || '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
         }
