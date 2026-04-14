@@ -1,34 +1,20 @@
 name: Publish to npm
 
-# Two triggers:
+# Triggered when a version tag is created — by git push or the GitHub API.
 #
-# 1. create — fires when a ref is created via the GitHub API or git push.
-#    push: tags: only fires for git-push operations; tags created via the
-#    REST API (POST /git/refs) do not trigger push events. The create event
-#    fires for both. Job condition filters to our @polygonlabs/** tags only.
-#    Note: GitHub skips create events when >3 refs are created at once, but
-#    we create each tag in a separate API call so each fires individually.
+# push: tags: only fires for git push operations. Tags created via the REST
+# API (POST /git/refs) use the create: event instead. create: covers both
+# cases, so it replaces push: tags: here.
 #
-# 2. workflow_dispatch — allows manual re-triggering if publish fails,
-#    and was used to publish the initial 0.7.0 release.
+# The job condition filters to @polygonlabs/** tags; branch creates are skipped.
+# Note: GitHub skips create events when >3 refs are created at once, but each
+# tag is created in a separate API call so each fires its own event.
 #
-# lerna publish from-package is idempotent: it only publishes versions not
-# yet on the registry. Running it multiple times is safe.
-#
-# Private packages (agent-connector-ui, agent-shared) are skipped by lerna.
+# lerna publish from-package is idempotent — it only publishes versions not
+# yet on the registry. Private packages (agent-connector-ui, agent-shared)
+# are skipped automatically by lerna.
 on:
   create:
-  workflow_dispatch:
-    inputs:
-      dist_tag:
-        description: 'npm dist-tag to publish with'
-        required: true
-        default: 'latest'
-        type: choice
-        options:
-          - latest
-          - beta
-          - dev
 
 permissions:
   contents: read
@@ -36,11 +22,7 @@ permissions:
 
 jobs:
   publish:
-    # For create events: only run for @polygonlabs/** tags, not branch creates.
-    # For workflow_dispatch: always run.
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/@polygonlabs/'))
+    if: github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/@polygonlabs/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -56,20 +38,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Determine dist-tag
+      - name: Determine dist-tag from triggering tag
         id: dist-tag
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "value=${{ github.event.inputs.dist_tag }}" >> "$GITHUB_OUTPUT"
+          # GITHUB_REF_NAME is the tag name, e.g. "@polygonlabs/agent-cli@0.7.0"
+          # Extract the version portion (everything after the last @)
+          VERSION="${GITHUB_REF_NAME##*@}"
+          # Pull the prerelease identifier out of the version string, if present
+          # e.g. "0.7.0-beta.1" → "beta", "0.7.0" → "latest"
+          if [[ "$VERSION" =~ -([a-zA-Z]+)\. ]]; then
+            echo "value=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
           else
-            # GITHUB_REF_NAME is the tag name, e.g. "@polygonlabs/agent-cli@0.7.0"
-            # Extract the version portion (everything after the last @)
-            VERSION="${GITHUB_REF_NAME##*@}"
-            if [[ "$VERSION" =~ -([a-zA-Z]+)\. ]]; then
-              echo "value=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
-            else
-              echo "value=latest" >> "$GITHUB_OUTPUT"
-            fi
+            echo "value=latest" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Publish to npm

@@ -148,11 +148,7 @@ if [[ "$HEAD_AFTER" == "$HEAD_BEFORE" ]]; then
     fi
   done
 
-  echo "==> Triggering npm-publish workflow"
-  gh workflow run npm-publish.yml \
-    --repo "${OWNER_REPO}" \
-    --field dist_tag="${DIST_TAG}"
-  echo "  Triggered. https://github.com/${OWNER_REPO}/actions/workflows/npm-publish.yml"
+  echo "==> Done. npm-publish.yml triggered by create: event for each tag."
   exit 0
 fi
 
@@ -226,8 +222,7 @@ if [[ "$DRY_RUN" == "true" ]]; then
     echo "  gh release create ${TAG} --generate-notes --verify-tag"
     echo ""
   done
-  echo "  gh workflow run npm-publish.yml --field dist_tag=${DIST_TAG}"
-  echo "    (explicit trigger — API-created tags do not fire push events)"
+  echo "  (npm-publish.yml triggered by create: event for each tag above)"
   echo ""
   echo "==> Verifying tree SHA is consistent"
   RECOMPUTED=$(git rev-parse 'HEAD^{tree}')
@@ -349,17 +344,4 @@ for TAG in $LERNA_TAGS; do
   fi
 done
 
-# ---------------------------------------------------------------------------
-# Stage 5: trigger npm publish
-#
-# Tags created via the GitHub REST API do not fire push events, so the
-# push: tags: trigger in npm-publish.yml would never fire. The create:
-# event does fire for API-created refs, but we also call gh workflow run
-# explicitly here as belt-and-suspenders — lerna publish from-package is
-# idempotent so running it twice is safe.
-# ---------------------------------------------------------------------------
-echo "==> Stage 5: triggering npm-publish workflow"
-gh workflow run npm-publish.yml \
-  --repo "${OWNER_REPO}" \
-  --field dist_tag="${DIST_TAG}"
-echo "  Triggered. https://github.com/${OWNER_REPO}/actions/workflows/npm-publish.yml"
+echo "==> Done. npm-publish.yml will be triggered by the create: event for each tag."
