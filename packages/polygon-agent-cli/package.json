@@ -8,6 +8,9 @@
     "directory": "packages/polygon-agent-cli"
   },
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "bin": {
     "polygon-agent": "dist/index.js"
   },
@@ -17,7 +20,7 @@
     "skills"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "node scripts/build.mjs",
     "prepublishOnly": "pnpm run build",
     "dev": "tsx src/index.ts",
     "lint": "eslint .",
@@ -39,7 +42,6 @@
     "@noble/ciphers": "^1.2.1",
     "@noble/curves": "^1.8.1",
     "@noble/hashes": "^1.7.2",
-    "@polygonlabs/agent-shared": "workspace:*",
     "@polymarket/clob-client": "^5.2.4",
     "@polymarket/order-utils": "^3.0.1",
     "@polymarket/sdk": "^6.0.1",
@@ -59,8 +61,10 @@
     "yargs": "^17.7.2"
   },
   "devDependencies": {
+    "@polygonlabs/agent-shared": "workspace:*",
     "@types/react": "^18.3.1",
-    "@types/yargs": "^17.0.33"
+    "@types/yargs": "^17.0.33",
+    "esbuild": "^0.28.0"
   },
   "engines": {
     "node": ">=20.0.0"

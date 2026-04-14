@@ -1,11 +1,9 @@
 import type { CommandModule } from 'yargs';
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import { Contract, Interface, JsonRpcProvider } from 'ethers';
 
+import IDENTITY_ABI from '../../contracts/IdentityRegistry.json' with { type: 'json' };
+import REPUTATION_ABI from '../../contracts/ReputationRegistry.json' with { type: 'json' };
 import { runDappClientTx } from '../lib/dapp-client.ts';
 import {
   resolveNetwork,
@@ -15,19 +13,8 @@ import {
   fileCoerce
 } from '../lib/utils.ts';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 const IDENTITY_REGISTRY = '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432';
 const REPUTATION_REGISTRY = '0x8004BAa17C55a88189AE136b182e5fdA19dE9b63';
-
-// ABIs are loaded relative to the package root (contracts/ directory)
-const contractsDir = path.resolve(__dirname, '..', '..', 'contracts');
-const IDENTITY_ABI = JSON.parse(
-  fs.readFileSync(path.join(contractsDir, 'IdentityRegistry.json'), 'utf8')
-);
-const REPUTATION_ABI = JSON.parse(
-  fs.readFileSync(path.join(contractsDir, 'ReputationRegistry.json'), 'utf8')
-);
 
 // --- register ---
 async function handleRegister(argv: {
