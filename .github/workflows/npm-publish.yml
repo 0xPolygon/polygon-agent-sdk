@@ -15,6 +15,14 @@ name: Publish to npm
 # are skipped automatically by lerna.
 on:
   create:
+  workflow_dispatch:
+    inputs:
+      dist_tag:
+        description: 'npm dist-tag'
+        required: true
+        default: 'latest'
+        type: choice
+        options: [latest, beta, dev]
 
 permissions:
   contents: read
@@ -22,7 +30,9 @@ permissions:
 
 jobs:
   publish:
-    if: github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/@polygonlabs/')
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/@polygonlabs/'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -38,18 +48,22 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Determine dist-tag from triggering tag
+      - name: Determine dist-tag
         id: dist-tag
         run: |
-          # GITHUB_REF_NAME is the tag name, e.g. "@polygonlabs/agent-cli@0.7.0"
-          # Extract the version portion (everything after the last @)
-          VERSION="${GITHUB_REF_NAME##*@}"
-          # Pull the prerelease identifier out of the version string, if present
-          # e.g. "0.7.0-beta.1" → "beta", "0.7.0" → "latest"
-          if [[ "$VERSION" =~ -([a-zA-Z]+)\. ]]; then
-            echo "value=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "value=${{ github.event.inputs.dist_tag }}" >> "$GITHUB_OUTPUT"
           else
-            echo "value=latest" >> "$GITHUB_OUTPUT"
+            # GITHUB_REF_NAME is the tag name, e.g. "@polygonlabs/agent-cli@0.7.0"
+            # Extract the version portion (everything after the last @)
+            VERSION="${GITHUB_REF_NAME##*@}"
+            # Pull the prerelease identifier out of the version string, if present
+            # e.g. "0.7.0-beta.1" → "beta", "0.7.0" → "latest"
+            if [[ "$VERSION" =~ -([a-zA-Z]+)\. ]]; then
+              echo "value=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            else
+              echo "value=latest" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Publish to npm
