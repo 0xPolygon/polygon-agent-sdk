@@ -71,5 +71,4 @@ jobs:
           echo "Publishing with dist-tag: ${{ steps.dist-tag.outputs.value }}"
           pnpm exec lerna publish from-package \
             --dist-tag "${{ steps.dist-tag.outputs.value }}" \
-            --access public \
             --yes
