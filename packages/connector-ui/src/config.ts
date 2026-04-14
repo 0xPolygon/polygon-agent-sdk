@@ -1,4 +1,4 @@
-// Configured via VITE_WALLET_URL secret
+// Configured via VITE_* secrets (per-environment values set in GitHub Environments)
 const walletUrlRaw = import.meta.env.VITE_WALLET_URL as string;
 // Avoid double slashes in wallet routing (walletUrl should not end with /)
 export const walletUrl = walletUrlRaw.replace(/\/+$/, '');
@@ -9,6 +9,7 @@ export const dappOrigin =
 
 export const projectAccessKey = import.meta.env.VITE_PROJECT_ACCESS_KEY as string;
 export const relayerUrl = (import.meta.env.VITE_RELAYER_URL as string | undefined) || undefined;
+export const trailsApiKey = (import.meta.env.VITE_TRAILS_API_KEY as string | undefined) ?? '';
 
 // Pass the base gateway URL; the Sequence SDK composes the final URL with the access key.
 export const nodesUrl =

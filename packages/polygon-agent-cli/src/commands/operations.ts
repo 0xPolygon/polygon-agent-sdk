@@ -1,5 +1,7 @@
 import type { CommandModule, Argv } from 'yargs';
 
+import React from 'react';
+
 import { runDappClientTx } from '../lib/dapp-client.ts';
 import { loadWalletSession, loadBuilderConfig } from '../lib/storage.ts';
 import { resolveErc20BySymbol } from '../lib/token-directory.ts';
@@ -10,6 +12,8 @@ import {
   getExplorerUrl,
   fileCoerce
 } from '../lib/utils.ts';
+import { isTTY, inkRender } from '../ui/render.js';
+import { BalancesUI, FundUI, SendUI } from './operations-ui.js';
 
 // Shared options
 function withWalletAndChain<T>(yargs: Argv<T>) {
@@ -115,88 +119,105 @@ export const balancesCommand: CommandModule = {
   handler: async (argv) => {
     const walletName = argv.wallet as string;
 
-    try {
-      const session = await loadWalletSession(walletName);
-      if (!session) {
-        throw new Error(`Wallet not found: ${walletName}`);
-      }
-
-      const indexerKey =
-        process.env.SEQUENCE_INDEXER_ACCESS_KEY ||
-        session.projectAccessKey ||
-        process.env.SEQUENCE_PROJECT_ACCESS_KEY;
-      if (!indexerKey) {
-        throw new Error('Missing project access key (not in wallet session or environment)');
-      }
-
-      const network = resolveNetwork((argv.chain as string) || session.chain || 'polygon');
-      const nativeDecimals = network.nativeToken?.decimals ?? 18;
-      const nativeSymbol = network.nativeToken?.symbol || 'POL';
-
-      const { SequenceIndexer } = await import('@0xsequence/indexer');
-      const indexerUrl = getChainIndexerUrl(network.chainId);
-      const indexer = new SequenceIndexer(indexerUrl, indexerKey);
-
-      const [nativeRes, tokenRes] = await Promise.all([
-        indexer.getNativeTokenBalance({
-          accountAddress: session.walletAddress
-        }),
-        indexer.getTokenBalances({
-          accountAddress: session.walletAddress,
-          includeMetadata: true
-        })
-      ]);
-
-      const nativeWei = nativeRes?.balance?.balance || '0';
-      const native = [
-        {
-          type: 'native',
-          symbol: nativeSymbol,
-          balance: formatUnits(BigInt(nativeWei), nativeDecimals)
+    if (!isTTY()) {
+      // Non-TTY: original JSON output
+      try {
+        const session = await loadWalletSession(walletName);
+        if (!session) {
+          throw new Error(`Wallet not found: ${walletName}`);
         }
-      ];
 
-      const erc20 = (tokenRes?.balances || []).map(
-        (b: {
-          contractInfo?: { symbol?: string; name?: string; decimals?: number };
-          contractAddress: string;
-          balance?: string;
-        }) => ({
-          type: 'erc20',
-          symbol: b.contractInfo?.symbol || 'ERC20',
-          name: b.contractInfo?.name || undefined,
-          contractAddress: b.contractAddress,
-          balance: formatUnits(b.balance || '0', b.contractInfo?.decimals ?? 18)
-        })
-      );
+        const indexerKey =
+          process.env.SEQUENCE_INDEXER_ACCESS_KEY ||
+          session.projectAccessKey ||
+          process.env.SEQUENCE_PROJECT_ACCESS_KEY;
+        if (!indexerKey) {
+          throw new Error('Missing project access key (not in wallet session or environment)');
+        }
 
-      console.log(
-        JSON.stringify(
+        const network = resolveNetwork((argv.chain as string) || session.chain || 'polygon');
+        const nativeDecimals = network.nativeToken?.decimals ?? 18;
+        const nativeSymbol = network.nativeToken?.symbol || 'POL';
+
+        const { SequenceIndexer } = await import('@0xsequence/indexer');
+        const indexerUrl = getChainIndexerUrl(network.chainId);
+        const indexer = new SequenceIndexer(indexerUrl, indexerKey);
+
+        const [nativeRes, tokenRes] = await Promise.all([
+          indexer.getNativeTokenBalance({
+            accountAddress: session.walletAddress
+          }),
+          indexer.getTokenBalances({
+            accountAddress: session.walletAddress,
+            includeMetadata: true
+          })
+        ]);
+
+        const nativeWei = nativeRes?.balance?.balance || '0';
+        const native = [
           {
-            ok: true,
+            type: 'native',
+            symbol: nativeSymbol,
+            balance: formatUnits(BigInt(nativeWei), nativeDecimals)
+          }
+        ];
+
+        const erc20 = (tokenRes?.balances || []).map(
+          (b: {
+            contractInfo?: { symbol?: string; name?: string; decimals?: number };
+            contractAddress: string;
+            balance?: string;
+          }) => ({
+            type: 'erc20',
+            symbol: b.contractInfo?.symbol || 'ERC20',
+            name: b.contractInfo?.name || undefined,
+            contractAddress: b.contractAddress,
+            balance: formatUnits(b.balance || '0', b.contractInfo?.decimals ?? 18)
+          })
+        );
+
+        console.log(
+          JSON.stringify(
+            {
+              ok: true,
+              walletName,
+              walletAddress: session.walletAddress,
+              chainId: network.chainId,
+              chain: network.name,
+              balances: [...native, ...erc20]
+            },
+            null,
+            2
+          )
+        );
+      } catch (error) {
+        console.error(
+          JSON.stringify(
+            {
+              ok: false,
+              error: (error as Error).message,
+              stack: (error as Error).stack
+            },
+            null,
+            2
+          )
+        );
+        process.exit(1);
+      }
+    } else {
+      // TTY: Ink UI
+      let failed = false;
+      try {
+        await inkRender(
+          React.createElement(BalancesUI, {
             walletName,
-            walletAddress: session.walletAddress,
-            chainId: network.chainId,
-            chain: network.name,
-            balances: [...native, ...erc20]
-          },
-          null,
-          2
-        )
-      );
-    } catch (error) {
-      console.error(
-        JSON.stringify(
-          {
-            ok: false,
-            error: (error as Error).message,
-            stack: (error as Error).stack
-          },
-          null,
-          2
-        )
-      );
-      process.exit(1);
+            chainOverride: argv.chain as string | undefined
+          })
+        );
+      } catch {
+        failed = true;
+      }
+      if (failed) process.exit(1);
     }
   }
 };
@@ -226,20 +247,26 @@ export const fundCommand: CommandModule = {
 
       const fundingUrl = `https://demo.trails.build/?mode=swap&toAddress=${walletAddress}&toChainId=${chainId}&toToken=${toToken}&apiKey=${apiKey}&theme=light`;
 
-      console.log(
-        JSON.stringify(
-          {
-            ok: true,
-            walletName,
-            walletAddress,
-            chainId,
-            fundingUrl,
-            message: 'Open the funding URL in your browser to fund your wallet via Trails.'
-          },
-          null,
-          2
-        )
-      );
+      if (isTTY()) {
+        await inkRender(
+          React.createElement(FundUI, { walletName, walletAddress, chainId, fundingUrl })
+        );
+      } else {
+        console.log(
+          JSON.stringify(
+            {
+              ok: true,
+              walletName,
+              walletAddress,
+              chainId,
+              fundingUrl,
+              message: 'Open the funding URL in your browser to fund your wallet via Trails.'
+            },
+            null,
+            2
+          )
+        );
+      }
     } catch (error) {
       console.error(
         JSON.stringify(
@@ -343,16 +370,18 @@ async function handleSendNative(argv: {
   const walletName = (argv.wallet as string) || 'main';
   const to = argv.to as string;
   const amount = argv.amount as string;
-  const broadcast = argv.broadcast as boolean;
+  const broadcast = (argv.broadcast as boolean) || false;
 
-  try {
+  // Build transaction and execute
+  async function exec(): Promise<{
+    txHash?: string;
+    explorerUrl?: string;
+    walletAddress?: string;
+  }> {
     const session = await loadWalletSession(walletName);
-    if (!session) {
-      throw new Error(`Wallet not found: ${walletName}`);
-    }
+    if (!session) throw new Error(`Wallet not found: ${walletName}`);
 
     const network = resolveNetwork((argv.chain as string) || session.chain || 'polygon');
-
     const decimals = network.nativeToken?.decimals ?? 18;
     const value = parseUnits(amount, decimals);
 
@@ -377,39 +406,100 @@ async function handleSendNative(argv: {
       preferNativeFee: true
     });
 
-    if (!broadcast) return;
-
+    if (!broadcast) return {};
     const explorerUrl = getExplorerUrl(network, result.txHash ?? '');
-    console.log(
-      JSON.stringify(
-        {
-          ok: true,
+    return { txHash: result.txHash, explorerUrl, walletAddress: result.walletAddress };
+  }
+
+  if (!isTTY()) {
+    // Non-TTY: original JSON output
+    try {
+      const session = await loadWalletSession(walletName);
+      if (!session) throw new Error(`Wallet not found: ${walletName}`);
+
+      const network = resolveNetwork((argv.chain as string) || session.chain || 'polygon');
+      const decimals = network.nativeToken?.decimals ?? 18;
+      const value = parseUnits(amount, decimals);
+
+      const useDirectNative =
+        (argv.direct as boolean) ||
+        ['1', 'true', 'yes'].includes(
+          String(process.env.SEQ_ECO_NATIVE_DIRECT || '').toLowerCase()
+        );
+
+      const VALUE_FORWARDER = '0xABAAd93EeE2a569cF0632f39B10A9f5D734777ca';
+      const selector = '0x98f850f1';
+      const pad = (hex: string, n = 64) => String(hex).replace(/^0x/, '').padStart(n, '0');
+      const data = selector + pad(to) + pad('0x' + value.toString(16));
+
+      const transactions = useDirectNative
+        ? [{ to, value, data: '0x' }]
+        : [{ to: VALUE_FORWARDER, value, data }];
+
+      const result = await runDappClientTx({
+        walletName,
+        chainId: network.chainId,
+        transactions,
+        broadcast,
+        preferNativeFee: true
+      });
+
+      if (!broadcast) return;
+
+      const explorerUrl = getExplorerUrl(network, result.txHash ?? '');
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            walletName,
+            walletAddress: result.walletAddress,
+            chain: network.name,
+            chainId: network.chainId,
+            to,
+            amount,
+            txHash: result.txHash,
+            explorerUrl
+          },
+          null,
+          2
+        )
+      );
+    } catch (error) {
+      console.error(
+        JSON.stringify(
+          {
+            ok: false,
+            error: (error as Error).message,
+            stack: (error as Error).stack
+          },
+          null,
+          2
+        )
+      );
+      process.exit(1);
+    }
+  } else {
+    // TTY: Ink UI
+    let failed = false;
+    try {
+      const session = await loadWalletSession(walletName);
+      const network = resolveNetwork((argv.chain as string) || session?.chain || 'polygon');
+      const nativeSymbol = network.nativeToken?.symbol || 'POL';
+
+      await inkRender(
+        React.createElement(SendUI, {
           walletName,
-          walletAddress: result.walletAddress,
-          chain: network.name,
-          chainId: network.chainId,
           to,
           amount,
-          txHash: result.txHash,
-          explorerUrl
-        },
-        null,
-        2
-      )
-    );
-  } catch (error) {
-    console.error(
-      JSON.stringify(
-        {
-          ok: false,
-          error: (error as Error).message,
-          stack: (error as Error).stack
-        },
-        null,
-        2
-      )
-    );
-    process.exit(1);
+          symbol: nativeSymbol,
+          broadcast,
+          onExec: exec
+        })
+      );
+    } catch {
+      failed = true;
+    }
+    if (failed) process.exit(1);
   }
 }
 
@@ -462,97 +552,138 @@ async function handleSendToken(argv: {
   [key: string]: unknown;
 }): Promise<void> {
   const walletName = (argv.wallet as string) || 'main';
-  const symbol = argv.symbol as string | undefined;
+  const symbolArg = argv.symbol as string | undefined;
   const tokenAddress = argv.token as string | undefined;
   const decimalsArg = argv.decimals as number | undefined;
   const to = argv.to as string;
   const amount = argv.amount as string;
   const broadcast = (argv.broadcast as boolean) || false;
 
-  try {
+  // Resolve token info
+  async function resolveToken(): Promise<{
+    token: string;
+    decimals: number;
+    resolvedSymbol: string;
+    network: ReturnType<typeof resolveNetwork>;
+  }> {
     const session = await loadWalletSession(walletName);
-    if (!session) {
-      throw new Error(`Wallet not found: ${walletName}`);
-    }
+    if (!session) throw new Error(`Wallet not found: ${walletName}`);
 
     const network = resolveNetwork((argv.chain as string) || session.chain || 'polygon');
-
     let token = tokenAddress;
     let decimals = decimalsArg ?? null;
+    let resolvedSymbol = symbolArg || 'TOKEN';
 
-    if (symbol) {
-      const resolved = await resolveErc20BySymbol({
-        chainId: network.chainId,
-        symbol
-      });
-      if (!resolved) {
-        throw new Error(`Unknown token symbol: ${symbol} on ${network.name}`);
-      }
+    if (symbolArg) {
+      const resolved = await resolveErc20BySymbol({ chainId: network.chainId, symbol: symbolArg });
+      if (!resolved) throw new Error(`Unknown token symbol: ${symbolArg} on ${network.name}`);
       token = resolved.address;
       decimals = Number(resolved.decimals);
+      resolvedSymbol = symbolArg;
     }
 
-    if (!token || decimals === null) {
+    if (!token || decimals === null)
       throw new Error('Provide either --symbol OR (--token + --decimals)');
-    }
+    return { token, decimals, resolvedSymbol, network };
+  }
 
+  async function exec(): Promise<{
+    txHash?: string;
+    explorerUrl?: string;
+    walletAddress?: string;
+  }> {
+    const { token, decimals, network } = await resolveToken();
     const value = parseUnits(amount, decimals);
     const selector = '0xa9059cbb';
     const pad = (hex: string, n = 64) => String(hex).replace(/^0x/, '').padStart(n, '0');
     const data = selector + pad(to) + pad('0x' + value.toString(16));
 
-    const transactions = [
-      {
-        to: token,
-        value: 0n,
-        data
-      }
-    ];
-
     const result = await runDappClientTx({
       walletName,
       chainId: network.chainId,
-      transactions,
+      transactions: [{ to: token, value: 0n, data }],
       broadcast,
       preferNativeFee: false
     });
 
-    if (!broadcast) return;
-
+    if (!broadcast) return {};
     const explorerUrl = getExplorerUrl(network, result.txHash ?? '');
-    console.log(
-      JSON.stringify(
-        {
-          ok: true,
+    return { txHash: result.txHash, explorerUrl, walletAddress: result.walletAddress };
+  }
+
+  if (!isTTY()) {
+    // Non-TTY: original JSON output
+    try {
+      const { token, decimals, resolvedSymbol, network } = await resolveToken();
+      const value = parseUnits(amount, decimals);
+      const selector = '0xa9059cbb';
+      const pad = (hex: string, n = 64) => String(hex).replace(/^0x/, '').padStart(n, '0');
+      const data = selector + pad(to) + pad('0x' + value.toString(16));
+
+      const result = await runDappClientTx({
+        walletName,
+        chainId: network.chainId,
+        transactions: [{ to: token, value: 0n, data }],
+        broadcast,
+        preferNativeFee: false
+      });
+
+      if (!broadcast) return;
+
+      const explorerUrl = getExplorerUrl(network, result.txHash ?? '');
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            walletName,
+            walletAddress: result.walletAddress,
+            chain: network.name,
+            chainId: network.chainId,
+            symbol: resolvedSymbol,
+            tokenAddress: token,
+            decimals,
+            to,
+            amount,
+            txHash: result.txHash,
+            explorerUrl
+          },
+          null,
+          2
+        )
+      );
+    } catch (error) {
+      console.error(
+        JSON.stringify(
+          {
+            ok: false,
+            error: (error as Error).message,
+            stack: (error as Error).stack
+          },
+          null,
+          2
+        )
+      );
+      process.exit(1);
+    }
+  } else {
+    // TTY: Ink UI
+    let failed = false;
+    try {
+      const { resolvedSymbol } = await resolveToken();
+      await inkRender(
+        React.createElement(SendUI, {
           walletName,
-          walletAddress: result.walletAddress,
-          chain: network.name,
-          chainId: network.chainId,
-          symbol: symbol || 'TOKEN',
-          tokenAddress: token,
-          decimals,
           to,
           amount,
-          txHash: result.txHash,
-          explorerUrl
-        },
-        null,
-        2
-      )
-    );
-  } catch (error) {
-    console.error(
-      JSON.stringify(
-        {
-          ok: false,
-          error: (error as Error).message,
-          stack: (error as Error).stack
-        },
-        null,
-        2
-      )
-    );
-    process.exit(1);
+          symbol: resolvedSymbol,
+          broadcast,
+          onExec: exec
+        })
+      );
+    } catch {
+      failed = true;
+    }
+    if (failed) process.exit(1);
   }
 }
 
@@ -1108,16 +1239,178 @@ export const x402PayCommand: CommandModule = {
 
       const eoaAccount = privateKeyToAccount(builderConfig.privateKey as `0x${string}`);
 
-      const probe = await fetch(url, { method });
+      const probe = await fetch(url, {
+        method,
+        body: body || undefined,
+        headers: (() => {
+          const h: Record<string, string> = {};
+          for (const hdr of headerArgs) {
+            const idx = hdr.indexOf(':');
+            if (idx > 0) h[hdr.slice(0, idx).trim()] = hdr.slice(idx + 1).trim();
+          }
+          return Object.keys(h).length ? h : undefined;
+        })()
+      });
       if (probe.status !== 402) {
         const contentType = probe.headers.get('content-type') || '';
         const data = contentType.includes('application/json')
           ? await probe.json()
           : await probe.text();
-        console.log(JSON.stringify({ ok: probe.ok, status: probe.status, data }, null, 2));
+        console.log(JSON.stringify({ ok: probe.ok, status: probe.status, data }));
         return;
       }
 
+      const headers: Record<string, string> = {};
+      for (const h of headerArgs) {
+        const idx = h.indexOf(':');
+        if (idx > 0) headers[h.slice(0, idx).trim()] = h.slice(idx + 1).trim();
+      }
+
+      // Detect custom payment_details format (e.g. x402-api.onrender.com)
+      // vs standard x402 X-PAYMENT-REQUIRED header format.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let probeBody: any = null;
+      try {
+        probeBody = await probe.clone().json();
+      } catch {
+        // not JSON — fall through to standard x402
+      }
+
+      // x402 Bazaar payment format — specific to x402-api.onrender.com.
+      // Not a general x402 standard; do not apply to other endpoints.
+      const isX402Bazaar = new URL(url).hostname === 'x402-api.onrender.com';
+      if (isX402Bazaar && (probeBody?.payment_address || probeBody?.payment_details)) {
+        const pad = (hex: string, n = 64) => String(hex).replace(/^0x/, '').padStart(n, '0');
+        let payChain: string;
+        let payChainId: number;
+        let payRecipient: string;
+        let amountUsdc: number;
+        let usdcContract: string;
+
+        if (probeBody.payment_address) {
+          // Current x402 Bazaar format
+          const supportedChains: { chain: string; chainId: number }[] = Array.isArray(
+            probeBody.supported_chains
+          )
+            ? probeBody.supported_chains
+            : [];
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const usdcContracts: Record<string, string> = (probeBody.usdc_contracts as any) || {};
+          const polygonEntry = supportedChains.find(
+            (c) => c.chain === 'polygon' || c.chainId === 137
+          );
+          if (polygonEntry) {
+            payChain = 'polygon';
+            payChainId = 137;
+            usdcContract = usdcContracts['polygon'] || '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
+          } else if (supportedChains.length > 0) {
+            const first = supportedChains[0];
+            payChain = first.chain;
+            payChainId = first.chainId;
+            usdcContract = usdcContracts[first.chain] || '';
+            if (!usdcContract) throw new Error(`No USDC contract known for chain ${payChain}`);
+          } else {
+            throw new Error('No supported chains in 402 response');
+          }
+          payRecipient = probeBody.payment_address as string;
+          amountUsdc = probeBody.amount_usdc as number;
+        } else {
+          // Legacy payment_details format
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const details = probeBody.payment_details as any;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const networks: any[] = Array.isArray(details.networks) ? details.networks : [];
+
+          const polygonNet = networks.find(
+            (n: any) => n.network === 'polygon' || n.chainId === 137
+          );
+          if (!polygonNet) throw new Error('No Polygon payment option in 402 response');
+          payChain = 'polygon';
+          payChainId = 137;
+          payRecipient = (polygonNet.recipient || details.recipient) as string;
+          amountUsdc = details.amount as number;
+          usdcContract = polygonNet.usdc_contract || '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
+        }
+
+        const amountUnits = BigInt(Math.round(amountUsdc * 1_000_000));
+        const transferData =
+          '0xa9059cbb' + pad(payRecipient) + pad('0x' + amountUnits.toString(16));
+
+        process.stderr.write(`Sending ${amountUsdc} USDC to ${payRecipient} on ${payChain}...\n`);
+        const fundResult = await runDappClientTx({
+          walletName,
+          chainId: payChainId,
+          transactions: [{ to: usdcContract, value: 0n, data: transferData }],
+          broadcast: true
+        });
+        const payTxHash = fundResult.txHash!;
+        process.stderr.write(`Paid via tx: ${payTxHash}\n`);
+
+        // Wait for the transaction to be confirmed before presenting to the server
+        process.stderr.write('Waiting for confirmation...\n');
+        const rpcUrl =
+          process.env.SEQUENCE_NODES_URL?.replace('{network}', payChain) ||
+          `https://nodes.sequence.app/${payChain}/${session.projectAccessKey || process.env.SEQUENCE_PROJECT_ACCESS_KEY || ''}`;
+        for (let attempt = 0; attempt < 30; attempt++) {
+          await new Promise((r) => setTimeout(r, 3000));
+          try {
+            const rpcRes = await fetch(rpcUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'eth_getTransactionReceipt',
+                params: [payTxHash]
+              })
+            });
+            const rpcData = (await rpcRes.json()) as { result?: { status?: string } | null };
+            if (rpcData.result?.status === '0x1') {
+              process.stderr.write('Transaction confirmed.\n');
+              break;
+            }
+          } catch {
+            // ignore RPC errors, keep polling
+          }
+        }
+
+        const retryHeaders: Record<string, string> = {
+          ...headers,
+          'X-Payment-TxHash': payTxHash,
+          'X-Payment-Chain': payChain
+        };
+        if (body) retryHeaders['Content-Type'] = 'application/json';
+
+        const response = await fetch(url, {
+          method,
+          headers: retryHeaders,
+          body: body || undefined
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        const data = contentType.includes('application/json')
+          ? await response.json()
+          : await response.text();
+
+        console.log(
+          JSON.stringify(
+            {
+              ok: response.ok,
+              status: response.status,
+              walletAddress: session.walletAddress,
+              funded: { amount: amountUsdc, asset: usdcContract, txHash: payTxHash },
+              data
+            },
+            null,
+            2
+          )
+        );
+
+        if (!response.ok) process.exit(1);
+        return;
+      }
+
+      // Standard x402 flow: EIP-3009 signed payment via facilitator
       const httpClient = new x402HTTPClient(new x402Client());
       const paymentRequired = httpClient.getPaymentRequiredResponse(
         (n: string) => probe.headers.get(n),
@@ -1155,12 +1448,6 @@ export const x402PayCommand: CommandModule = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       client.register('eip155:*', new ExactEvmScheme(eoaAccount as any));
       const fetchWithPayment = wrapFetchWithPayment(fetch, client);
-
-      const headers: Record<string, string> = {};
-      for (const h of headerArgs) {
-        const idx = h.indexOf(':');
-        if (idx > 0) headers[h.slice(0, idx).trim()] = h.slice(idx + 1).trim();
-      }
 
       const response = await fetchWithPayment(url, {
         method,
