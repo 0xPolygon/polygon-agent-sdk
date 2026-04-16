@@ -108,16 +108,19 @@ interface PoolTokenInfo {
 
 Pool discovery uses `TrailsApi.getEarnPools` — picks the most liquid pool (highest TVL) for the asset on the current chain. No hardcoded addresses — the pool is resolved at runtime.
 
+**Note on Morpho Vaults:**
+Trails categorizes Morpho vaults by their *receipt* token symbol (e.g., `STEAKUSDC` or `gtUSDCp`), rather than the underlying token. To deposit into a Morpho vault, you must provide the vault's exact receipt token symbol as the `--asset`.
+If you try to deposit using `--asset USDC`, it may fail to find the pool. In those cases, you can use the `swap` command to swap `USDC` directly for the vault's receipt token address.
+
 ```bash
 # Dry-run — shows pool name, APY, TVL, and deposit address before committing
-polygon-agent deposit --asset USDC --amount 0.3
+polygon-agent deposit --asset STEAKUSDC --amount 0.3 --protocol morpho
 
 # Execute — deposits into the highest-TVL active pool
-polygon-agent deposit --asset USDC --amount 0.3 --broadcast
+polygon-agent deposit --asset STEAKUSDC --amount 0.3 --protocol morpho --broadcast
 
-# Filter by protocol
+# Filter by protocol (Aave uses the underlying asset name)
 polygon-agent deposit --asset USDC --amount 0.3 --protocol aave --broadcast
-polygon-agent deposit --asset USDC --amount 0.3 --protocol morpho --broadcast
 ```
 
 ### Supported Protocols
