@@ -1124,10 +1124,7 @@ export const depositCommand: CommandModule = {
       let pools = ((earnRes as any)?.pools || []).filter(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (p: any) =>
-          p.isActive &&
-          p.chainId === chainId &&
-          (p.token?.symbol?.toUpperCase() === assetSymbol ||
-            p.token?.address?.toLowerCase() === asset.address.toLowerCase())
+          p.isActive && p.chainId === chainId && p.token?.symbol?.toUpperCase() === assetSymbol
       );
 
       if (protocolFilter) {
