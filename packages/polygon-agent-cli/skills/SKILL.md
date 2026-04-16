@@ -129,7 +129,7 @@ polygon-agent agent feedback --agent-id <id> --value <score> [--tag1 <t>] [--tag
 - **Smart defaults** — `--wallet main`, `--chain polygon`, auto-wait on `wallet create`
 - **Fee preference** — auto-selects USDC over native POL when both available
 - **`fund`** — reads `walletAddress` from the wallet session and sets it as `toAddress` in the Trails widget URL. Always run `polygon-agent fund` to get the correct URL — never construct it manually or hardcode any address.
-- **`deposit`** — picks highest-TVL pool via Trails `getEarnPools`. If session rejects (contract not whitelisted), re-create wallet with `--contract <depositAddress>`
+- **`deposit`** — picks highest-TVL pool via Trails `getEarnPools`. Sends two txs: ERC-20 `approve()` on the token contract, then the pool deposit. If session rejects, re-create wallet with both `--contract <tokenAddress> --contract <depositAddress>` (the dry-run output shows both addresses).
 - **`x402-pay`** — probes endpoint for 402, smart wallet funds builder EOA with exact token amount, EOA signs EIP-3009 payment. Chain auto-detected from 402 response
 - **`send-native --direct`** — bypasses ValueForwarder contract for direct EOA transfer
 - **Session permissions** — without `--usdc-limit` etc., session gets bare-bones defaults and may not transact
@@ -199,7 +199,7 @@ For specific workflows, load the relevant sub-skill:
 | `Timed out waiting for wallet approval` | Add `--timeout 600` |
 | `Invalid code: hash mismatch` | Wrong 6-digit code entered — retry (3 attempts allowed) |
 | `Relay request not found` | Session expired or already used — re-run `wallet create` (or `wallet create --print-url`) |
-| Deposit session rejected | Re-create wallet with `--contract <depositAddress>` |
+| Deposit session rejected | Re-create wallet with `--contract <tokenAddress> --contract <depositAddress>` (both required: token approve + pool call) |
 | Wrong recipient in Trails widget | Run `polygon-agent fund` (do not construct the URL manually) |
 | `x402-pay`: no 402 response | Endpoint doesn't require x402 payment, or URL is wrong |
 | `x402-pay`: payment token mismatch | Chain/token in the 402 response differs from wallet — check `--wallet` points to the right chain |
