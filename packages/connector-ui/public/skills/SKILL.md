@@ -20,15 +20,15 @@ description: "Complete Polygon agent toolkit for on-chain operations on Polygon.
 
 ## Environment Variables
 
-### Access key — auto-loaded, no export needed
+### Access key — one key, many names
 
-After `setup` runs, the access key is stored in `~/.polygon-agent/builder.json`. The CLI bootstraps it into `SEQUENCE_PROJECT_ACCESS_KEY` and `SEQUENCE_INDEXER_ACCESS_KEY` automatically on every invocation. Trails commands additionally fall back through `session.projectAccessKey` → `SEQUENCE_PROJECT_ACCESS_KEY`, so `TRAILS_API_KEY` also does not need to be exported manually.
+`SEQUENCE_PROJECT_ACCESS_KEY`, `SEQUENCE_INDEXER_ACCESS_KEY`, and `TRAILS_API_KEY` are **all the same key** — the Sequence project access key created during `setup`. The CLI treats them as aliases and falls back through all of them automatically.
 
-**In a fresh agent session with no environment variables set**, simply run commands — the CLI reads credentials from disk. No `export` step is required between phases.
+After `setup` runs the key is stored in `~/.polygon-agent/builder.json`. Every CLI invocation bootstraps it into the environment — no `export` is needed. In a fresh agent session with no environment variables set, simply run commands and the CLI reads credentials from disk.
 
 Only set these manually to override the stored value (e.g. to point at a different project):
 ```bash
-export SEQUENCE_PROJECT_ACCESS_KEY=<override-key>
+export SEQUENCE_PROJECT_ACCESS_KEY=<key>  # also covers TRAILS_API_KEY and indexer calls
 ```
 
 ### Optional overrides
