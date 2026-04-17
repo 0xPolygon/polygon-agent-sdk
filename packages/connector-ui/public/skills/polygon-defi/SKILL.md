@@ -108,16 +108,19 @@ interface PoolTokenInfo {
 
 Pool discovery uses `TrailsApi.getEarnPools` — picks the most liquid pool (highest TVL) for the asset on the current chain. No hardcoded addresses — the pool is resolved at runtime.
 
+**Note on Morpho Vaults:**
+Trails categorizes Morpho vaults by their *receipt* token symbol (e.g., `STEAKUSDC` or `gtUSDCp`), rather than the underlying token. To deposit into a Morpho vault, you must provide the vault's exact receipt token symbol as the `--asset`.
+If you try to deposit using `--asset USDC`, it may fail to find the pool. In those cases, you can use the `swap` command to swap `USDC` directly for the vault's receipt token address.
+
 ```bash
 # Dry-run — shows pool name, APY, TVL, and deposit address before committing
-polygon-agent deposit --asset USDC --amount 0.3
+polygon-agent deposit --asset STEAKUSDC --amount 0.3 --protocol morpho
 
 # Execute — deposits into the highest-TVL active pool
-polygon-agent deposit --asset USDC --amount 0.3 --broadcast
+polygon-agent deposit --asset STEAKUSDC --amount 0.3 --protocol morpho --broadcast
 
-# Filter by protocol
+# Filter by protocol (Aave uses the underlying asset name)
 polygon-agent deposit --asset USDC --amount 0.3 --protocol aave --broadcast
-polygon-agent deposit --asset USDC --amount 0.3 --protocol morpho --broadcast
 ```
 
 ### Supported Protocols
@@ -128,6 +131,25 @@ polygon-agent deposit --asset USDC --amount 0.3 --protocol morpho --broadcast
 | **Morpho** | `deposit(assets, receiver)` — ERC-4626 | Vault deposit |
 
 Vault/pool addresses are resolved dynamically from Trails — they are not hardcoded. The dry-run output includes `depositAddress` so you can inspect the exact contract before broadcasting.
+
+## Withdraw (Aave aToken or ERC-4626 vault)
+
+Pass the **position token** you hold: an **Aave aToken** address, or a **Morpho / ERC-4626 vault** (share) address. The CLI resolves the Aave **Pool** via `POOL()` on the aToken, or uses `redeem` on the vault. Dry-run by default.
+
+```bash
+# Full exit from an Aave position (aToken from balances output)
+polygon-agent withdraw --position 0x68215b6533c47ff9f7125ac95adf00fe4a62f79e --amount max --chain mainnet
+
+# Partial Aave withdraw (underlying units, e.g. USDC)
+polygon-agent withdraw --position <aToken> --amount 0.5 --chain mainnet --broadcast
+
+# ERC-4626: max redeems all shares; partial amount is underlying units (convertToShares)
+polygon-agent withdraw --position <vault> --amount max --chain polygon --broadcast
+```
+
+Whitelist the **pool** (Aave) or **vault** contract on the session if the wallet rejects the call (`polygon-agent wallet create --contract <poolOrVault>`).
+
+**Same chain as the transaction:** if you use `withdraw --chain mainnet`, create or refresh the session with **`wallet create --chain mainnet`** (not only Polygon defaults). Include **`--contract`** for the **pool** and for the **underlying ERC-20** on that chain (e.g. mainnet USDC `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`) so fee / helper transfers are allowed. Tight **`--usdc-limit`** can block those — omit or relax for yield exits.
 
 ### Session Whitelisting
 
