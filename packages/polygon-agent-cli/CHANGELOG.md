@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.1](https://github.com/0xPolygon/polygon-agent-cli/compare/@polygonlabs/agent-cli@0.9.0...@polygonlabs/agent-cli@0.9.1) (2026-04-21)
+
+
+### Bug Fixes
+
+* **cli:** always use builder.json access key for Trails API ([be49e24](https://github.com/0xPolygon/polygon-agent-cli/commit/be49e24cb94d54b5a2b041ca6d89d8d3b502c15a))
+
+
+
+
+
 # [0.9.0](https://github.com/0xPolygon/polygon-agent-cli/compare/@polygonlabs/agent-cli@0.8.0...@polygonlabs/agent-cli@0.9.0) (2026-04-21)
 
 
