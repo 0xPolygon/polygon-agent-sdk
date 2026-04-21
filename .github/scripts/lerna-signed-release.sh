@@ -269,7 +269,15 @@ else
   # pass nested JSON with large base64 payloads is unreliable; --input avoids
   # all shell escaping and size issues.
   GQL_TMPFILE=$(mktemp /tmp/lerna-release-graphql-XXXXXX.json)
-  trap 'rm -f "$GQL_TMPFILE"' EXIT
+  ADDITIONS_FILE=$(mktemp /tmp/lerna-release-additions-XXXXXX.json)
+  DELETIONS_FILE=$(mktemp /tmp/lerna-release-deletions-XXXXXX.json)
+  trap 'rm -f "$GQL_TMPFILE" "$ADDITIONS_FILE" "$DELETIONS_FILE"' EXIT
+
+  # Spill additions/deletions to files and load with --slurpfile. Passing the
+  # base64-encoded file contents via --argjson exceeds ARG_MAX (~128 KB on
+  # Linux) once a release touches more than a handful of sizeable files.
+  printf '%s' "$ADDITIONS" > "$ADDITIONS_FILE"
+  printf '%s' "$DELETIONS" > "$DELETIONS_FILE"
 
   jq -n \
     --arg query 'mutation CreateSignedCommit($input: CreateCommitOnBranchInput!) {
@@ -280,15 +288,15 @@ else
     --arg headline "$COMMIT_HEADLINE" \
     --arg body "$COMMIT_BODY" \
     --arg expectedHeadOid "$PARENT_SHA" \
-    --argjson additions "$ADDITIONS" \
-    --argjson deletions "$DELETIONS" \
+    --slurpfile additions "$ADDITIONS_FILE" \
+    --slurpfile deletions "$DELETIONS_FILE" \
     '{
       "query": $query,
       "variables": {
         "input": {
           "branch": {"repositoryNameWithOwner": $repo, "branchName": $branch},
           "message": {"headline": $headline, "body": $body},
-          "fileChanges": {"additions": $additions, "deletions": $deletions},
+          "fileChanges": {"additions": $additions[0], "deletions": $deletions[0]},
           "expectedHeadOid": $expectedHeadOid
         }
       }
