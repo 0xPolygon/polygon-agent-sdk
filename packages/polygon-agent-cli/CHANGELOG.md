@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.3](https://github.com/0xPolygon/polygon-agent-cli/compare/@polygonlabs/agent-cli@0.9.2...@polygonlabs/agent-cli@0.9.3) (2026-04-22)
+
+
+### Bug Fixes
+
+* **polymarket:** remove hardcoded feeRateBps to let CLOB client resolve market fee rate ([c6b8232](https://github.com/0xPolygon/polygon-agent-cli/commit/c6b823279b5f32076104983c3fdd8e73934dade6))
+
+
+
+
+
 ## [0.9.2](https://github.com/0xPolygon/polygon-agent-cli/compare/@polygonlabs/agent-cli@0.9.1...@polygonlabs/agent-cli@0.9.2) (2026-04-22)
 
 
