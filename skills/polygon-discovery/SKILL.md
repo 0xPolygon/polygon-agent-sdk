@@ -9,6 +9,8 @@ Pay-per-call APIs accessible via `x402-pay`. No API keys or subscriptions — ea
 
 **Catalog:** `GET https://x402-api.onrender.com/api/catalog?status=online`
 
+> **Warning:** All `/api/call/<uuid>` catalog endpoints require an `X-Admin-Token` header and are not publicly accessible via x402 payment. Always use the direct `/api/<service>` routes documented below instead.
+
 ---
 
 ## Prerequisites — Check Before Any x402 Call
@@ -37,28 +39,21 @@ Once a funded wallet is confirmed, proceed with the x402 calls below.
 
 $0.005 USDC per call.
 
-> **Note:** The catalog proxy (`/api/call/99063826-...`) returns 401 or HTML for this service.
-> Use the direct endpoint below instead.
+> **Note:** Use GET, not POST — the schema only accepts GET/HEAD/DELETE. POST returns 401.
 
 ```bash
 # Profile + recent tweets
 polygon-agent x402-pay \
   --url "https://x402-api.onrender.com/api/twitter?user=<username>" \
-  --wallet main --method POST
+  --wallet main --method GET
 
 # Specific tweet
 polygon-agent x402-pay \
   --url "https://x402-api.onrender.com/api/twitter?tweet=https://x.com/user/status/<id>" \
-  --wallet main --method POST
+  --wallet main --method GET
 ```
 
 Returns: follower/following counts and tweet metrics.
-
-**Troubleshooting:** If the direct endpoint fails, check the live catalog for the current URL:
-```bash
-curl -s "https://x402-api.onrender.com/api/catalog?status=online" \
-  | jq '.[] | select(.name | test("twitter"; "i"))'
-```
 
 ---
 
@@ -68,11 +63,24 @@ $0.02 USDC per call. Powered by Google Gemini.
 
 ```bash
 polygon-agent x402-pay \
-  --url "https://x402-api.onrender.com/api/call/2998d205-94d9-4f7e-8f8a-201a090a5530?prompt=<description>&size=512" \
+  --url "https://x402-api.onrender.com/api/image?prompt=<description>&size=512" \
   --wallet main --method GET
 ```
 
-`size` options: `256`, `512`, `1024`. Returns JSON with `data_uri` (base64 PNG) for embedding.
+`size` options: `256`, `512`, `1024`.
+
+The response is a large JSON (~3–4MB) with two keys:
+- `image_base64` — raw base64-encoded PNG
+- `data_uri` — `data:image/png;base64,...` ready for embedding in HTML
+
+**To save the image to a file:**
+```python
+import json, base64
+
+data = json.load(open('response.json'))
+with open('output.png', 'wb') as f:
+    f.write(base64.b64decode(data['data']['image_base64']))
+```
 
 ---
 
@@ -82,8 +90,9 @@ $0.01 USDC per call. Powered by GPT-4o.
 
 ```bash
 polygon-agent x402-pay \
-  --url "https://x402-api.onrender.com/api/call/7f21e675-9fdc-4ba3-9a8d-145c6ac703c7" \
+  --url "https://x402-api.onrender.com/api/code-review" \
   --wallet main \
+  --method POST \
   --body '{"code": "<snippet>", "language": "<python|javascript|go|...>"}'
 ```
 
