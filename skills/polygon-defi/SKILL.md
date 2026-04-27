@@ -106,7 +106,7 @@ interface PoolTokenInfo {
 
 ## Deposit to Earn Yield
 
-Pool discovery uses `TrailsApi.getEarnPools` — picks the most liquid pool (highest TVL) for the asset. Only Polygon mainnet (chainId 137) is supported. No hardcoded addresses — the pool is resolved at runtime.
+Pool discovery uses `TrailsApi.getEarnPools` — picks the most liquid pool (highest TVL) for the asset on the requested chain. No hardcoded addresses — the pool is resolved at runtime. Supported chains: Polygon, Base, Arbitrum, Optimism, Ethereum mainnet (any chain Trails indexes).
 
 **Gas requirement:** The wallet needs POL for gas, or a session created with `--usdc-limit` to enable USDC paymaster. If the wallet has no POL, create the session with `--usdc-limit 5`. When USDC paymaster is active and the deposit amount would consume the full balance, the CLI auto-reserves 0.05 USDC for gas and prints a note.
 

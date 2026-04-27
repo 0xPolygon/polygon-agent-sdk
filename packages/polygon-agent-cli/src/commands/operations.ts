@@ -1095,12 +1095,6 @@ export const depositCommand: CommandModule = {
       const { chainId } = network;
       const walletAddress = session.walletAddress;
 
-      if (chainId !== 137) {
-        throw new Error(
-          `deposit only supports Polygon mainnet (chainId 137). Pass --chain polygon or omit --chain.`
-        );
-      }
-
       const asset = await getTokenConfig({
         chainId,
         symbol: assetSymbol,
@@ -1153,11 +1147,10 @@ export const depositCommand: CommandModule = {
         createPublicClient,
         http
       } = await import('viem');
-      const { polygon: polygonViemChain } = await import('viem/chains');
-
       // Pre-flight: verify balance and auto-reserve gas buffer when wallet has no native token
       try {
-        const publicClient = createPublicClient({ chain: polygonViemChain, transport: http() });
+        const viemChain = await viemChainForDeposit(chainId);
+        const publicClient = createPublicClient({ chain: viemChain, transport: http() });
         const [usdcBal, nativeBal] = await Promise.all([
           publicClient.readContract({
             address: asset.address as `0x${string}`,
@@ -1478,10 +1471,10 @@ const ERC4626_REDEEM_ABI = [
   }
 ] as const;
 
-async function viemChainForWithdraw(chainId: number) {
+async function viemChainMap() {
   const { mainnet, polygon, arbitrum, optimism, base, avalanche, bsc, gnosis, polygonAmoy } =
     await import('viem/chains');
-  const map = {
+  return {
     1: mainnet,
     137: polygon,
     42161: arbitrum,
@@ -1491,7 +1484,21 @@ async function viemChainForWithdraw(chainId: number) {
     56: bsc,
     100: gnosis,
     80002: polygonAmoy
-  } as const;
+  } as const satisfies Record<number, unknown>;
+}
+
+async function viemChainForDeposit(chainId: number) {
+  const map = await viemChainMap();
+  const c = map[chainId as keyof typeof map];
+  if (!c)
+    throw new Error(
+      `deposit: chainId ${chainId} has no bundled viem chain config for pre-flight check.`
+    );
+  return c;
+}
+
+async function viemChainForWithdraw(chainId: number) {
+  const map = await viemChainMap();
   const c = map[chainId as keyof typeof map];
   if (!c) {
     throw new Error(
