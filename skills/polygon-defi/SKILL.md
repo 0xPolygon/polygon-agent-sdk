@@ -110,6 +110,21 @@ Pool discovery uses `TrailsApi.getEarnPools` — picks the most liquid pool (hig
 
 **Gas requirement:** The wallet needs POL for gas, or a session created with `--usdc-limit` to enable USDC paymaster. If the wallet has no POL, create the session with `--usdc-limit 5`. When USDC paymaster is active and the deposit amount would consume the full balance, the CLI auto-reserves 0.05 USDC for gas and prints a note.
 
+**Session setup:** The wallet session must whitelist the token contract and the pool deposit contract, or the relay will reject the transaction with a 400 error. Run a dry-run first to get the exact addresses, then create (or re-create) the session with both contracts:
+
+```bash
+# 1. Dry-run to discover the token address and pool depositAddress
+polygon-agent deposit --asset USDC --amount 1
+
+# 2. Create session with those contracts whitelisted (prevents 400 permission error on broadcast)
+polygon-agent wallet create --usdc-limit 5 --contract <tokenAddress> --contract <depositAddress>
+
+# 3. Broadcast
+polygon-agent deposit --asset USDC --amount 1 --broadcast
+```
+
+Omitting `--contract` for the deposit pool is the most common cause of a "Request aborted" (code 1005) error on broadcast.
+
 ```bash
 # Dry-run — shows pool name, APY, TVL, and deposit address before committing
 polygon-agent deposit --asset USDC --amount 0.3
@@ -152,7 +167,7 @@ Whitelist the **pool** (Aave) or **vault** contract on the session if the wallet
 
 ### Session Whitelisting
 
-A deposit sends **two transactions**: an ERC-20 `approve()` on the token contract, then the pool deposit call. Both contracts must be whitelisted in the session. If the deposit is rejected with a session permission error:
+If the deposit is rejected with a session permission error, both the token contract and the pool deposit contract must be whitelisted in the session:
 
 ```bash
 # 1. Dry-run first — output includes both addresses under `transactions[0].to` (token) and `depositAddress` (pool)
