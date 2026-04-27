@@ -1083,7 +1083,7 @@ export const depositCommand: CommandModule = {
   handler: async (argv) => {
     const walletName = (argv.wallet as string) || 'main';
     const assetSymbol = ((argv.asset as string) || 'USDC').toUpperCase();
-    const amountArg = argv.amount as string;
+    let amountArg = argv.amount as string;
     const protocolFilter = argv.protocol as string | undefined;
     const broadcast = argv.broadcast as boolean;
 
@@ -1094,6 +1094,12 @@ export const depositCommand: CommandModule = {
       const network = resolveNetwork((argv.chain as string) || session.chain || 'polygon');
       const { chainId } = network;
       const walletAddress = session.walletAddress;
+
+      if (chainId !== 137) {
+        throw new Error(
+          `deposit only supports Polygon mainnet (chainId 137). Pass --chain polygon or omit --chain.`
+        );
+      }
 
       const asset = await getTokenConfig({
         chainId,
@@ -1128,9 +1134,10 @@ export const depositCommand: CommandModule = {
 
       if (pools.length === 0) {
         throw new Error(
-          `No active earn pools found for ${assetSymbol} on ${network.name}` +
-            (protocolFilter ? ` (protocol filter: ${protocolFilter})` : '') +
-            `. Try 'polygon-agent swap --from ${assetSymbol} --to <yield-token>' as an alternative.`
+          `No active ${assetSymbol} earn pools found on ${network.name}` +
+            (protocolFilter ? ` (protocol: ${protocolFilter})` : '') +
+            `. Confirm wallet state: polygon-agent balances. ` +
+            `Alternative: polygon-agent swap --from ${assetSymbol} --to <yield-token>.`
         );
       }
 
@@ -1139,7 +1146,58 @@ export const depositCommand: CommandModule = {
       const pool = pools[0];
       const proto = (pool.protocol || '').toLowerCase();
 
-      const { encodeFunctionData, parseUnits: viemParseUnits } = await import('viem');
+      const {
+        encodeFunctionData,
+        parseUnits: viemParseUnits,
+        formatUnits: viemFormatUnits,
+        createPublicClient,
+        http
+      } = await import('viem');
+      const { polygon: polygonViemChain } = await import('viem/chains');
+
+      // Pre-flight: verify balance and auto-reserve gas buffer when wallet has no native token
+      try {
+        const publicClient = createPublicClient({ chain: polygonViemChain, transport: http() });
+        const [usdcBal, nativeBal] = await Promise.all([
+          publicClient.readContract({
+            address: asset.address as `0x${string}`,
+            abi: ERC20_BALANCE_OF_ABI,
+            functionName: 'balanceOf',
+            args: [walletAddress as `0x${string}`]
+          }),
+          publicClient.getBalance({ address: walletAddress as `0x${string}` })
+        ]);
+        const requestedUnits = viemParseUnits(amountArg, asset.decimals);
+        const GAS_RESERVE = viemParseUnits('0.05', asset.decimals);
+        if (usdcBal < requestedUnits) {
+          const available = viemFormatUnits(usdcBal, asset.decimals);
+          throw new Error(
+            `Insufficient ${assetSymbol}: wallet has ${available} ${assetSymbol}, deposit requires ${amountArg}. ` +
+              `Run: polygon-agent balances`
+          );
+        }
+        if (nativeBal === 0n && requestedUnits + GAS_RESERVE > usdcBal) {
+          // Wallet has no POL — USDC paymaster will pay gas; auto-reduce to leave 0.05 buffer
+          const adjusted = usdcBal - GAS_RESERVE;
+          if (adjusted <= 0n) {
+            throw new Error(
+              `Insufficient ${assetSymbol} for deposit plus 0.05 gas reserve. ` +
+                `Fund with POL for native gas: polygon-agent fund`
+            );
+          }
+          amountArg = viemFormatUnits(adjusted, asset.decimals);
+          process.stderr.write(
+            `Note: reduced deposit to ${amountArg} ${assetSymbol} (0.05 reserved for USDC gas)\n`
+          );
+        }
+      } catch (e) {
+        if ((e as Error).message?.match(/^Insufficient/)) throw e;
+        // RPC unreachable — warn and continue
+        process.stderr.write(
+          `Warning: balance pre-flight check skipped (${(e as Error).message})\n`
+        );
+      }
+
       const amountUnits = viemParseUnits(amountArg, asset.decimals);
 
       const ERC20_APPROVE_ABI = [
@@ -1267,11 +1325,31 @@ export const depositCommand: CommandModule = {
           preferNativeFee: false
         });
       } catch (txErr) {
-        if ((txErr as Error).message?.includes('No signer supported')) {
+        const txMsg = (txErr as Error).message || '';
+        if (txMsg.includes('No signer supported')) {
           throw new Error(
             `Session does not permit calls to ${pool.depositAddress} (${pool.protocol} pool) or ${asset.address} (${assetSymbol} approve). ` +
               `Re-create the wallet session with: polygon-agent wallet create --contract ${asset.address} --contract ${pool.depositAddress}\n` +
-              `Original error: ${(txErr as Error).message}`
+              `Original error: ${txMsg}`
+          );
+        }
+        if (txMsg.includes('Identity signers not found') || txMsg.includes('signers not found')) {
+          throw new Error(
+            `Wallet has no POL for gas and no USDC paymaster is configured. ` +
+              `Fund with POL: polygon-agent fund\n` +
+              `Or enable USDC gas: polygon-agent wallet create --usdc-limit 5\n` +
+              `Original error: ${txMsg}`
+          );
+        }
+        if (
+          txMsg.includes('Request aborted') ||
+          txMsg.includes('AbortedError') ||
+          txMsg.includes('code 1005')
+        ) {
+          throw new Error(
+            `Transaction rejected by relay — likely a session permission issue. ` +
+              `Re-create the wallet session: polygon-agent wallet create --contract ${asset.address} --contract ${pool.depositAddress}\n` +
+              `Original error: ${txMsg}`
           );
         }
         throw txErr;
