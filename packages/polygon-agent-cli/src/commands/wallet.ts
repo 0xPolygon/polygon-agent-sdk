@@ -51,8 +51,15 @@ const AUTO_WHITELISTED_CONTRACTS = [
   // NOTE: Trails deposit contract for swap --from POL is dynamic (changes per route/quote)
   // and cannot be reliably pre-whitelisted here.
 
-  // Polygon mainnet (chainId 137) — ERC-20 token contracts (needed for approve() in deposits/swaps)
+  // Polygon mainnet (chainId 137) — USDC tokens (needed for approve() in payments and transfers)
   '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', // USDC (native)
+  '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174' // USDC.e (bridged)
+];
+
+// Additional contracts whitelisted when --defi flag is passed.
+// Covers ERC-20s and yield vaults needed for swaps, bridges, and deposits.
+const DEFI_CONTRACTS = [
+  // Polygon mainnet (chainId 137) — additional ERC-20 token contracts
   '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', // USDT
   '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619', // WETH
 
@@ -80,6 +87,7 @@ interface SessionPermissionArgs {
   'usdt-limit'?: string;
   'token-limit'?: string[];
   contract?: string[];
+  defi?: boolean;
   'usdc-to'?: string;
   'usdc-amount'?: string;
   'access-key'?: string;
@@ -108,6 +116,10 @@ function addSessionPermissionOptions<T>(yargs: Argv<T>): Argv<T & SessionPermiss
       type: 'string',
       array: true,
       describe: 'Whitelist contract, repeatable'
+    })
+    .option('defi', {
+      type: 'boolean',
+      describe: 'Whitelist DeFi contracts (swaps, yield vaults) in addition to defaults'
     })
     .option('usdc-to', {
       type: 'string',
@@ -145,8 +157,11 @@ function applySessionPermissionParams(url: URL, argv: SessionPermissionArgs): vo
     .filter(Boolean);
   if (tokenLimits.length) url.searchParams.set('tokenLimits', tokenLimits.join(','));
 
+  const baseContracts = argv.defi
+    ? [...AUTO_WHITELISTED_CONTRACTS, ...DEFI_CONTRACTS]
+    : AUTO_WHITELISTED_CONTRACTS;
   const userContracts = (argv.contract || []).map((s) => String(s || '').trim()).filter(Boolean);
-  const allContracts = [...new Set([...AUTO_WHITELISTED_CONTRACTS, ...userContracts])];
+  const allContracts = [...new Set([...baseContracts, ...userContracts])];
   url.searchParams.set('contracts', allContracts.join(','));
 }
 
