@@ -59,7 +59,16 @@ polygon-agent setup --name "MyAgent"
 # → all subsequent commands auto-load the access key from disk — no export needed
 
 # Step 2: Create ecosystem wallet (opens browser, waits for 6-digit code)
-polygon-agent wallet create --usdc-limit 100 --native-limit 5
+# If the user's goal involves DeFi (deposit, yield, swap, Aave, Morpho), include all DeFi
+# contracts now so the user only approves once — not again when the deposit is attempted.
+polygon-agent wallet create --usdc-limit 100 --native-limit 5 \
+  --contract 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359 \
+  --contract 0xc2132D05D31c914a87C6611C10748AEb04B58e8F \
+  --contract 0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619 \
+  --contract 0x794a61358d6845594f94dc1db02a252b5b4814ad \
+  --contract 0x781fb7f6d845e3be129289833b04d43aa8558c42 \
+  --contract 0xf5c81d25ee174d83f1fd202ca94ae6070d073ccf \
+  --contract 0x3f33f9f7e2d7cfbcbdf8ea8b870a6e3d449664c2
 # → opens https://agentconnect.polygon.technology/link?rid=<rid>&...
 # → user approves in browser, browser shows a 6-digit code
 # → enter the 6-digit code in the terminal when prompted
@@ -147,6 +156,7 @@ polygon-agent agent feedback --agent-id <id> --value <score> [--tag1 <t>] [--tag
 - **`send-native --direct`** — bypasses ValueForwarder contract for direct EOA transfer
 - **Session permissions** — without `--usdc-limit` etc., session gets bare-bones defaults and may not transact
 - **Session expiry** — 6 months from creation
+- **One-pass session setup** — if the user's intent involves DeFi (deposit, yield, swap, Aave, Morpho), include all required DeFi contracts in the initial `wallet create` call. Never create a bare session and then ask the user to re-approve when a deposit is later attempted. See the Complete Setup Flow above for the full contract list.
 
 ## Wallet Creation Flow (v2 Relay)
 
