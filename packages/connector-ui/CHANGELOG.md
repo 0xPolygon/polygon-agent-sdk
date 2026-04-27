@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.4](https://github.com/0xPolygon/polygon-agent-cli/compare/@polygonlabs/agent-connector-ui@1.6.3...@polygonlabs/agent-connector-ui@1.6.4) (2026-04-27)
+
+
+### Bug Fixes
+
+* **deposit:** pre-flight balance checks, gas reserve, session guard, and actionable errors ([8011838](https://github.com/0xPolygon/polygon-agent-cli/commit/8011838f1ded843fc9666d0f3cb215e8cf871701))
+
+
+
+
+
 ## [1.6.3](https://github.com/0xPolygon/polygon-agent-cli/compare/@polygonlabs/agent-connector-ui@1.6.2...@polygonlabs/agent-connector-ui@1.6.3) (2026-04-22)
 
 **Note:** Version bump only for package @polygonlabs/agent-connector-ui

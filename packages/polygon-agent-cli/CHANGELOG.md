@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.9.4](https://github.com/0xPolygon/polygon-agent-cli/compare/@polygonlabs/agent-cli@0.9.3...@polygonlabs/agent-cli@0.9.4) (2026-04-27)
+
+
+### Bug Fixes
+
+* **deposit:** pre-flight balance checks, gas reserve, session guard, and actionable errors ([8011838](https://github.com/0xPolygon/polygon-agent-cli/commit/8011838f1ded843fc9666d0f3cb215e8cf871701))
+* **deposit:** remove Polygon-only chain restriction, support all Trails chains ([9d26bfc](https://github.com/0xPolygon/polygon-agent-cli/commit/9d26bfcb42f8fd516c4d5298891acca07b71c80b))
+* **fund:** point to wallet.polygon.technology instead of demo.trails.build ([9e2735d](https://github.com/0xPolygon/polygon-agent-cli/commit/9e2735d531277d178d7f6c308a5ac625d0e47526))
+
+
+### Reverts
+
+* **wallet:** remove session replacement guard ([8ab8150](https://github.com/0xPolygon/polygon-agent-cli/commit/8ab81501925b0bf9a75ea765b2e81d89399a0621))
+
+
+
+
+
 ## [0.9.3](https://github.com/0xPolygon/polygon-agent-cli/compare/@polygonlabs/agent-cli@0.9.2...@polygonlabs/agent-cli@0.9.3) (2026-04-22)
 
 
