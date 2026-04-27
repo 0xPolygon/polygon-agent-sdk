@@ -806,7 +806,7 @@ function App() {
             {
               title: 'Docs',
               desc: 'Full CLI reference, quickstart guide, and architecture docs to get your agent onchain fast.',
-              href: 'https://polygon-labs.mintlify.io/wallets/agentic-wallets'
+              href: 'https://docs.polygon.technology/payment-services/agentic-payments/polygon-agent-cli'
             }
           ].map((card) => (
             <a

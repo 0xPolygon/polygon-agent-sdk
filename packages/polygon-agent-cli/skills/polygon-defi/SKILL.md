@@ -146,9 +146,17 @@ polygon-agent withdraw --position <aToken> --amount 0.5 --chain mainnet --broadc
 polygon-agent withdraw --position <vault> --amount max --chain polygon --broadcast
 ```
 
-Whitelist the **pool** (Aave) or **vault** contract on the session if the wallet rejects the call (`polygon-agent wallet create --contract <poolOrVault>`).
+### Session Prerequisites for DeFi
 
-**Same chain as the transaction:** if you use `withdraw --chain mainnet`, create or refresh the session with **`wallet create --chain mainnet`** (not only Polygon defaults). Include **`--contract`** for the **pool** and for the **underlying ERC-20** on that chain (e.g. mainnet USDC `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`) so fee / helper transfers are allowed. Tight **`--usdc-limit`** can block those — omit or relax for yield exits.
+Before running deposits, swaps, or withdrawals, create the wallet session with `--defi` so the relevant token and vault contracts are whitelisted:
+
+```bash
+polygon-agent wallet create --defi
+```
+
+Without `--defi`, only USDC and USDC.e are whitelisted by default. The `--defi` flag adds USDT, WETH, and all supported yield vault addresses (Aave and Morpho on Polygon mainnet).
+
+**Same chain as the transaction:** if you use `withdraw --chain mainnet`, create or refresh the session with **`wallet create --chain mainnet --defi`**. Include **`--contract`** for the **underlying ERC-20** on that chain (e.g. mainnet USDC `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48`) since `--defi` only covers Polygon mainnet contracts. Tight **`--usdc-limit`** can block fee/helper transfers — omit or relax for yield exits.
 
 ### Session Whitelisting
 
@@ -160,19 +168,22 @@ polygon-agent deposit --asset USDC --amount 0.3
 # → note the token contract address (e.g. USDC: 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359)
 # → note the depositAddress (e.g. Aave V3: 0x794a61358d6845594f94dc1db02a252b5b4814ad)
 
-# 2. Re-create wallet session with BOTH contracts whitelisted
-polygon-agent wallet create --contract <tokenAddress> --contract <depositAddress>
+# 2. Re-create wallet session with DeFi contracts whitelisted (covers both token and vault)
+polygon-agent wallet create --defi
 
 # 3. Retry
 polygon-agent deposit --asset USDC --amount 0.3 --broadcast
 ```
 
-Common token contracts on Polygon mainnet (already auto-whitelisted in sessions created by the CLI):
-- USDC: `0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359`
-- USDT: `0xc2132D05D31c914a87C6611C10748AEb04B58e8F`
-- WETH: `0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619`
+To add a contract not covered by `--defi`, use `--contract` alongside it:
+
+```bash
+polygon-agent wallet create --defi --contract <extraAddress>
+```
 
 ### Yield Vault Contract Whitelist
+
+The following contracts are included when `--defi` is passed:
 
 #### Polygon Mainnet (chainId 137)
 
@@ -188,6 +199,9 @@ Common token contracts on Polygon mainnet (already auto-whitelisted in sessions 
 ## Full DeFi Flow Example
 
 ```bash
+# 0. Create session with DeFi contracts whitelisted
+polygon-agent wallet create --defi --usdc-limit 5
+
 # 1. Check balances
 polygon-agent balances
 
@@ -209,16 +223,17 @@ polygon-agent swap --from USDC --to USDC --amount 0.5 --to-chain arbitrum --broa
 
 | Flag | Purpose |
 |------|---------|
+| `--defi` | Whitelist DeFi contracts (USDT, WETH, yield vaults on Polygon mainnet). Required for swaps and deposits. |
 | `--usdc-limit <amt>` | Enable USDC gas paymaster. Required when the wallet has no POL. Recommended: `--usdc-limit 5`. |
 | `--force` | Replace an existing session without prompting. By default, re-creating a session is blocked if one already exists — the old wallet balance is not accessible from a new session. |
 | `--contract <addr>` | Whitelist an additional contract (repeatable). Use this if a deposit is rejected due to a missing contract permission. |
 
 ```bash
-# New session with USDC gas and deposit contracts pre-whitelisted
-polygon-agent wallet create --usdc-limit 5
+# New session for DeFi operations (swaps, deposits) with USDC gas paymaster
+polygon-agent wallet create --defi --usdc-limit 5
 
 # Replace an existing session
-polygon-agent wallet create --force --usdc-limit 5
+polygon-agent wallet create --defi --force --usdc-limit 5
 ```
 
 ---
@@ -229,7 +244,7 @@ polygon-agent wallet create --force --usdc-limit 5
 |-------|-------|-----|
 | `Insufficient <token>: wallet has X` | Balance too low for the requested deposit amount | Run `polygon-agent balances` and adjust `--amount` |
 | `Wallet has no POL for gas` | No native gas and no USDC paymaster | Fund with POL (`polygon-agent fund`) or re-create session with `--usdc-limit 5` |
-| `Transaction rejected by relay` | Session permissions missing for pool or token contract | Re-create with `--contract <tokenAddress> --contract <depositAddress>` |
+| `Transaction rejected by relay` | Session permissions missing for pool or token contract | Re-create with `--defi` or add `--contract <addr>` for a specific address |
 | `Unable to pay gas` | No usable fee token found | Fund with POL or add `--usdc-limit 5` to session |
 | `Wallet already exists` | Re-creating would orphan the old session | Use `--force` only after confirming old wallet funds are swept or unneeded |
 | `Protocol X not yet supported` | Trails returned a protocol other than aave/morpho | Use `polygon-agent swap` to obtain the yield-bearing token manually |
