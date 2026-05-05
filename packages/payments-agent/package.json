@@ -1,0 +1,23 @@
+{
+  "name": "@polygonlabs/payments-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Flue agent harness wrapping the Polygon Agent CLI for autonomous on-chain payments",
+  "type": "module",
+  "scripts": {
+    "dev": "flue dev --target node --env .env",
+    "build": "flue build --target node",
+    "start": "node dist/server.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@flue/sdk": "^0.3.10",
+    "valibot": "^1.0.0"
+  },
+  "devDependencies": {
+    "@flue/cli": "^0.3.10"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
