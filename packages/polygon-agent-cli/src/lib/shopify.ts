@@ -211,6 +211,41 @@ function parseProductDetail(p: any): ShopifyProduct {
   };
 }
 
+// ─── Dev Dashboard credential exchange ───────────────────────────────────────
+
+// Exchange Shopify Dev Dashboard client_id + client_secret for a bearer JWT.
+// Endpoint: POST https://api.shopify.com/auth/access_token
+// Uses the OAuth 2.0 client_credentials grant: form-urlencoded body with
+// grant_type=client_credentials. Returns the access_token for Checkout MCP.
+export async function exchangeClientCredentials(
+  clientId: string,
+  clientSecret: string
+): Promise<string> {
+  const body = new URLSearchParams({
+    grant_type: 'client_credentials',
+    client_id: clientId,
+    client_secret: clientSecret
+  });
+
+  const res = await fetch('https://api.shopify.com/auth/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString()
+  });
+
+  if (!res.ok) {
+    throw new Error(`Shopify token exchange failed: ${res.status} ${await res.text()}`);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const json: any = await res.json();
+  const token = json?.access_token ?? json?.token;
+  if (!token) {
+    throw new Error(`Shopify token exchange returned no access_token: ${JSON.stringify(json)}`);
+  }
+  return token as string;
+}
+
 // ─── Cart & Checkout MCP ─────────────────────────────────────────────────────
 
 // Normalize a merchant URL/domain to https://domain (no trailing slash)
@@ -236,7 +271,6 @@ export async function getMcpEndpoint(origin: string): Promise<string> {
   return `${origin}/api/ucp/mcp`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function callMerchantMcp(
   endpoint: string,
   toolName: string,

@@ -6,7 +6,13 @@
 
 import type { CommandModule } from 'yargs';
 
-import { createCart, createCheckout, getProduct, searchCatalog } from '../lib/shopify.ts';
+import {
+  createCart,
+  createCheckout,
+  exchangeClientCredentials,
+  getProduct,
+  searchCatalog
+} from '../lib/shopify.ts';
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
@@ -165,7 +171,25 @@ async function handleCheckout(argv: {
   zip?: string;
   token?: string;
 }): Promise<void> {
-  const token = argv.token ?? process.env.SHOPIFY_UCP_TOKEN;
+  // Resolve a Checkout MCP bearer token, in order of preference:
+  //   1. --token flag
+  //   2. SHOPIFY_UCP_TOKEN env var (pre-exchanged JWT)
+  //   3. SHOPIFY_UCP_CLIENT_ID + SHOPIFY_UCP_CLIENT_SECRET — auto-exchange
+  //      against https://api.shopify.com/auth/access_token to get a JWT.
+  let token: string | undefined = argv.token ?? process.env.SHOPIFY_UCP_TOKEN;
+
+  if (!token) {
+    const clientId = process.env.SHOPIFY_UCP_CLIENT_ID;
+    const clientSecret = process.env.SHOPIFY_UCP_CLIENT_SECRET;
+    if (clientId && clientSecret) {
+      try {
+        token = await exchangeClientCredentials(clientId, clientSecret);
+      } catch (err) {
+        console.error(JSON.stringify({ ok: false, error: (err as Error).message }));
+        process.exit(1);
+      }
+    }
+  }
 
   if (!token) {
     console.error(
@@ -173,7 +197,9 @@ async function handleCheckout(argv: {
         ok: false,
         error:
           'Checkout MCP requires a Shopify Dev Dashboard token. ' +
-          'Get one free at https://partners.shopify.com — then pass it via --token or set SHOPIFY_UCP_TOKEN.'
+          'Either pass --token / set SHOPIFY_UCP_TOKEN with a pre-exchanged JWT, ' +
+          'or set SHOPIFY_UCP_CLIENT_ID + SHOPIFY_UCP_CLIENT_SECRET in .env and the CLI will exchange them automatically. ' +
+          'Get credentials free at https://partners.shopify.com.'
       })
     );
     process.exit(1);

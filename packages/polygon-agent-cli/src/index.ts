@@ -4,8 +4,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { config as loadDotenv } from 'dotenv';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+
+// Load .env from CWD so values like SHOPIFY_UCP_CLIENT_ID / SHOPIFY_UCP_TOKEN
+// are picked up automatically. Does nothing if no .env exists.
+loadDotenv();
 
 import { agentCommand } from './commands/agent.ts';
 import {
